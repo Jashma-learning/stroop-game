@@ -141,8 +141,8 @@ export default function GameSeries() {
       {currentGame === "hanoi" && <TowerOfHanoi onComplete={(score, metrics) => handleGameComplete("hanoi", score, metrics)} />}
       {currentGame === "pattern" && <PatternPuzzler onComplete={(score) => handleGameComplete("pattern", score)} />}
       {currentGame === "maze" && <MazeGame onComplete={(score, metrics) => handleGameComplete("maze", score, metrics)} />}
-      {currentGame === "memory" && <MemoryGame onComplete={(score) => handleGameComplete("memory", score)} />}
-      {currentGame === "word" && <WordPuzzle onComplete={(score) => handleGameComplete("word", score)} />}
+      {currentGame === "memory" && <MemoryGame onComplete={(score, metrics) => handleGameComplete("memory", score, metrics)} />}
+      {currentGame === "word" && <WordPuzzle onComplete={(score, metrics) => handleGameComplete("word", score, metrics)} />}
       {currentGame === "complete" && (
         <Card className="w-full p-6 shadow-xl bg-white">
           <div className="text-center mb-6">

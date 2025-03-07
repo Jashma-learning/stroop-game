@@ -9,7 +9,34 @@ import { Input } from "@/components/ui/input"
 import { ArrowRight, Timer } from "lucide-react"
 
 interface WordPuzzleProps {
-  onComplete: (score: number) => void
+  onComplete: (score: number, metrics: WordPuzzleMetrics) => void
+}
+
+interface WordPuzzleMetrics {
+  totalTime: number;
+  wordsAttempted: number;
+  wordsCompleted: number;
+  incorrectAttempts: number;
+  accuracy: number;
+  averageTimePerWord: number;
+  wordAttempts: Array<{
+    word: string;
+    attempts: number;
+    timeTaken: number;
+    isCorrect: boolean;
+  }>;
+  performanceOverTime: {
+    firstHalf: {
+      accuracy: number;
+      speed: number;
+    };
+    secondHalf: {
+      accuracy: number;
+      speed: number;
+    };
+  };
+  longestStreak: number;
+  currentStreak: number;
 }
 
 const WORDS = [
@@ -74,6 +101,18 @@ export default function WordPuzzle({ onComplete }: WordPuzzleProps) {
   const [score, setScore] = useState(0)
   const [timeLeft, setTimeLeft] = useState(60)
   const [gameState, setGameState] = useState<"ready" | "playing" | "complete">("ready")
+  const [gameStartTime, setGameStartTime] = useState<number>(0)
+  const [wordStartTime, setWordStartTime] = useState<number>(0)
+  const [totalAttempts, setTotalAttempts] = useState(0)
+  const [incorrectAttempts, setIncorrectAttempts] = useState(0)
+  const [wordAttempts, setWordAttempts] = useState<WordPuzzleMetrics['wordAttempts']>([])
+  const [currentStreak, setCurrentStreak] = useState(0)
+  const [longestStreak, setLongestStreak] = useState(0)
+  const [firstHalfStats, setFirstHalfStats] = useState({
+    attempts: 0,
+    correct: 0,
+    time: 0
+  })
 
   // Load saved state from session storage on initial render
   useEffect(() => {
@@ -135,12 +174,22 @@ export default function WordPuzzle({ onComplete }: WordPuzzleProps) {
   }, [gameState])
 
   const startGame = () => {
+    const startTime = Date.now()
+    setGameStartTime(startTime)
     setGameState("playing")
     setScore(0)
     setTimeLeft(60)
+    setTotalAttempts(0)
+    setIncorrectAttempts(0)
+    setWordAttempts([])
+    setCurrentStreak(0)
+    setLongestStreak(0)
+    setFirstHalfStats({
+      attempts: 0,
+      correct: 0,
+      time: 0
+    })
     nextWord()
-    
-    // Clear previous session data for this game
     clearSessionStorage()
   }
 
@@ -167,11 +216,45 @@ export default function WordPuzzle({ onComplete }: WordPuzzleProps) {
     setCurrentWord(word)
     setShuffledWord(shuffleWord(word))
     setUserInput("")
+    setWordStartTime(Date.now())
   }, [])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (userInput.toUpperCase() === currentWord) {
+    const currentTime = Date.now()
+    const timeTaken = currentTime - (wordStartTime || currentTime)
+    setTotalAttempts(prev => prev + 1)
+
+    const isCorrect = userInput.toUpperCase() === currentWord
+    
+    // Update streaks
+    if (isCorrect) {
+      const newStreak = currentStreak + 1
+      setCurrentStreak(newStreak)
+      setLongestStreak(prev => Math.max(prev, newStreak))
+    } else {
+      setCurrentStreak(0)
+      setIncorrectAttempts(prev => prev + 1)
+    }
+
+    // Record attempt
+    setWordAttempts(prev => [...prev, {
+      word: currentWord,
+      attempts: isCorrect ? 1 : 0,
+      timeTaken,
+      isCorrect
+    }])
+
+    // Update first half stats if in first half of game time
+    if (timeLeft > 30) {
+      setFirstHalfStats(prev => ({
+        attempts: prev.attempts + 1,
+        correct: prev.correct + (isCorrect ? 1 : 0),
+        time: prev.time + timeTaken
+      }))
+    }
+
+    if (isCorrect) {
       setScore(score + 1)
       nextWord()
     } else {
@@ -180,10 +263,37 @@ export default function WordPuzzle({ onComplete }: WordPuzzleProps) {
   }
 
   const handleComplete = () => {
-    // Clear session storage when game is complete
+    const gameEndTime = Date.now()
+    const totalGameTime = gameEndTime - gameStartTime
+    const playTime = Math.min(totalGameTime, 60000) // Cap at 60 seconds
+
+    // Calculate final metrics
+    const metrics: WordPuzzleMetrics = {
+      totalTime: totalGameTime,
+      wordsAttempted: totalAttempts,
+      wordsCompleted: score,
+      incorrectAttempts,
+      accuracy: score / Math.max(totalAttempts, 1),
+      averageTimePerWord: playTime / Math.max(score, 1),
+      wordAttempts,
+      performanceOverTime: {
+        firstHalf: {
+          accuracy: firstHalfStats.correct / Math.max(firstHalfStats.attempts, 1),
+          speed: firstHalfStats.time / Math.max(firstHalfStats.attempts, 1)
+        },
+        secondHalf: {
+          accuracy: (score - firstHalfStats.correct) / 
+            Math.max(totalAttempts - firstHalfStats.attempts, 1),
+          speed: (playTime - firstHalfStats.time) / 
+            Math.max(totalAttempts - firstHalfStats.attempts, 1)
+        }
+      },
+      longestStreak,
+      currentStreak
+    }
+
     clearSessionStorage()
-    onComplete(score * 100) // Each correct word is worth 100 points
-    alert(`Game Over! Your score: ${score * 100}`)
+    onComplete(score * 100, metrics)
   }
 
   return (

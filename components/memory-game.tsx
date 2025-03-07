@@ -6,7 +6,35 @@ import { Card } from "@/components/ui/card"
 import { Heart, Star, Sun, Moon, Cloud, Flower2, LucideIcon, ArrowRight } from 'lucide-react'
 
 interface MemoryGameProps {
-  onComplete: (score: number) => void
+  onComplete: (score: number, metrics: MemoryMetrics) => void
+}
+
+interface MemoryMetrics {
+  totalTime: number;
+  memorizeTime: number;
+  totalMoves: number;
+  correctMatches: number;
+  incorrectAttempts: number;
+  matchAccuracy: number;
+  averageTimePerMove: number;
+  performanceOverTime: {
+    firstHalf: {
+      accuracy: number;
+      speed: number;
+    };
+    secondHalf: {
+      accuracy: number;
+      speed: number;
+    };
+  };
+  matchSequence: Array<{
+    moveNumber: number;
+    timeStamp: number;
+    isCorrect: boolean;
+    timeTaken: number;
+  }>;
+  memorizeEffectiveness: number; // Ratio of first-attempt correct matches
+  pairMatchTimes: number[]; // Time taken to find each pair
 }
 
 type MemoryCard = {
@@ -107,6 +135,17 @@ export default function MemoryGame({ onComplete }: MemoryGameProps) {
   const [matches, setMatches] = useState(0);
   const [isChecking, setIsChecking] = useState(false);
   const [memorizeTimeLeft, setMemorizeTimeLeft] = useState(10);
+  const [gameStartTime, setGameStartTime] = useState<number>(0);
+  const [moveStartTime, setMoveStartTime] = useState<number>(0);
+  const [totalMoves, setTotalMoves] = useState(0);
+  const [incorrectAttempts, setIncorrectAttempts] = useState(0);
+  const [matchSequence, setMatchSequence] = useState<MemoryMetrics['matchSequence']>([]);
+  const [pairMatchTimes, setPairMatchTimes] = useState<number[]>([]);
+  const [firstHalfStats, setFirstHalfStats] = useState({
+    moves: 0,
+    correct: 0,
+    time: 0
+  });
   
   // Add CSS styles
   useEffect(() => {
@@ -212,12 +251,15 @@ export default function MemoryGame({ onComplete }: MemoryGameProps) {
   }, []);
 
   const handleCardClick = (clickedIndex: number) => {
-    // Prevent clicks if we're checking for a match or the card is already matched
-    if (isChecking || cards[clickedIndex].isMatched || cards[clickedIndex].isFlipped) {
+    if (isChecking || cards[clickedIndex].isMatched || cards[clickedIndex].isFlipped || gameState !== "playing") {
       return;
     }
+
+    const currentTime = Date.now();
+    if (!moveStartTime) {
+      setMoveStartTime(currentTime);
+    }
     
-    // Create new cards array with the clicked card flipped
     const newCards = [...cards];
     newCards[clickedIndex] = {
       ...newCards[clickedIndex],
@@ -225,53 +267,121 @@ export default function MemoryGame({ onComplete }: MemoryGameProps) {
     };
     setCards(newCards);
     
-    // Check if we now have 2 cards flipped
     const flippedCards = newCards.filter(card => card.isFlipped && !card.isMatched);
     
     if (flippedCards.length === 2) {
       setIsChecking(true);
+      setTotalMoves(prev => prev + 1);
       
-      // Check for a match
       const [firstCard, secondCard] = flippedCards;
       const isMatch = Math.floor(firstCard.id / 2) === Math.floor(secondCard.id / 2);
+      const moveTime = currentTime - moveStartTime;
+      
+      // Record move in sequence
+      setMatchSequence(prev => [...prev, {
+        moveNumber: totalMoves + 1,
+        timeStamp: currentTime,
+        isCorrect: isMatch,
+        timeTaken: moveTime
+      }]);
+
+      // Update first half stats if we're in first half of the game
+      if (matches < CARD_CONFIGS.length / 2) {
+        setFirstHalfStats(prev => ({
+          moves: prev.moves + 1,
+          correct: prev.correct + (isMatch ? 1 : 0),
+          time: prev.time + moveTime
+        }));
+      }
       
       setTimeout(() => {
         let updatedCards;
         if (isMatch) {
-          // Match found - mark both cards as matched
           updatedCards = newCards.map(card => 
             card.isFlipped && !card.isMatched 
               ? { ...card, isMatched: true }
               : card
           );
           setMatches(matches + 1);
+          setPairMatchTimes(prev => [...prev, moveTime]);
           
-          // Check if game is complete
           if (matches + 1 === CARD_CONFIGS.length) {
+            const gameEndTime = Date.now();
+            const totalGameTime = gameEndTime - gameStartTime;
+            const memorizeTime = 10000; // 10 seconds in milliseconds
+            const playTime = totalGameTime - memorizeTime;
+            
+            // Calculate final metrics
+            const metrics: MemoryMetrics = {
+              totalTime: totalGameTime,
+              memorizeTime,
+              totalMoves: totalMoves + 1,
+              correctMatches: matches + 1,
+              incorrectAttempts,
+              matchAccuracy: (matches + 1) / (totalMoves + 1),
+              averageTimePerMove: playTime / (totalMoves + 1),
+              performanceOverTime: {
+                firstHalf: {
+                  accuracy: firstHalfStats.correct / Math.max(firstHalfStats.moves, 1),
+                  speed: firstHalfStats.time / Math.max(firstHalfStats.moves, 1)
+                },
+                secondHalf: {
+                  accuracy: (matches + 1 - firstHalfStats.correct) / 
+                    Math.max(totalMoves + 1 - firstHalfStats.moves, 1),
+                  speed: (playTime - firstHalfStats.time) / 
+                    Math.max(totalMoves + 1 - firstHalfStats.moves, 1)
+                }
+              },
+              matchSequence,
+              memorizeEffectiveness: matchSequence.filter(
+                (move, index) => index % 2 === 0 && move.isCorrect
+              ).length / CARD_CONFIGS.length,
+              pairMatchTimes
+            };
+
             setGameState("complete");
+            // Calculate score based on metrics
+            const accuracyBonus = Math.floor(metrics.matchAccuracy * 500);
+            const timeBonus = Math.max(0, Math.floor((120000 - totalGameTime) / 1000) * 5);
+            const memoryBonus = Math.floor(metrics.memorizeEffectiveness * 300);
+            const finalScore = Math.max(100, accuracyBonus + timeBonus + memoryBonus);
+            
+            setTimeout(() => onComplete(finalScore, metrics), 500);
           }
         } else {
-          // No match - flip cards back
           updatedCards = newCards.map(card => 
             card.isFlipped && !card.isMatched
               ? { ...card, isFlipped: false }
               : card
           );
+          setIncorrectAttempts(prev => prev + 1);
         }
         
         setCards(updatedCards);
         setIsChecking(false);
+        setMoveStartTime(0);
       }, 800);
     }
   };
 
   const startGame = useCallback(() => {
     const newCards = createCards();
+    const startTime = Date.now();
+    setGameStartTime(startTime);
     setGameState("memorizing");
-    setCards(newCards.map(card => ({ ...card, isFlipped: true }))); // Start with all cards face up
+    setCards(newCards.map(card => ({ ...card, isFlipped: true })));
     setMatches(0);
     setIsChecking(false);
     setMemorizeTimeLeft(10);
+    setTotalMoves(0);
+    setIncorrectAttempts(0);
+    setMatchSequence([]);
+    setPairMatchTimes([]);
+    setFirstHalfStats({
+      moves: 0,
+      correct: 0,
+      time: 0
+    });
     clearSessionStorage();
   }, [clearSessionStorage]);
 
@@ -279,7 +389,28 @@ export default function MemoryGame({ onComplete }: MemoryGameProps) {
     // Calculate score based on matches
     const score = matches * 100;
     clearSessionStorage();
-    onComplete(score);
+    onComplete(score, {
+      totalTime: 0,
+      memorizeTime: 0,
+      totalMoves: 0,
+      correctMatches: 0,
+      incorrectAttempts: 0,
+      matchAccuracy: 0,
+      averageTimePerMove: 0,
+      performanceOverTime: {
+        firstHalf: {
+          accuracy: 0,
+          speed: 0
+        },
+        secondHalf: {
+          accuracy: 0,
+          speed: 0
+        }
+      },
+      matchSequence: [],
+      memorizeEffectiveness: 0,
+      pairMatchTimes: []
+    });
   };
 
   return (

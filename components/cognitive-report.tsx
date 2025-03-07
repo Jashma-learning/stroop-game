@@ -257,6 +257,116 @@ export default function CognitiveReport({ scores, userData, metrics }: Cognitive
         </div>
       )}
 
+      {metrics?.memory && (
+        <div className="mb-4 p-4 bg-[#F3F4F6] rounded-lg">
+          <h3 className="text-lg font-semibold text-[#6D28D9] mb-2">Memory Game Metrics</h3>
+          
+          <div className="grid grid-cols-2 gap-4 mt-2">
+            <div>
+              <p className="font-medium">Total Time:</p>
+              <p>{(metrics.memory.totalTime / 1000).toFixed(2)}s</p>
+            </div>
+            <div>
+              <p className="font-medium">Memorization Time:</p>
+              <p>{(metrics.memory.memorizeTime / 1000).toFixed(2)}s</p>
+            </div>
+            <div>
+              <p className="font-medium">Total Moves:</p>
+              <p>{metrics.memory.totalMoves}</p>
+            </div>
+            <div>
+              <p className="font-medium">Correct Matches:</p>
+              <p>{metrics.memory.correctMatches}</p>
+            </div>
+            <div>
+              <p className="font-medium">Incorrect Attempts:</p>
+              <p>{metrics.memory.incorrectAttempts}</p>
+            </div>
+            <div>
+              <p className="font-medium">Match Accuracy:</p>
+              <p>{(metrics.memory.matchAccuracy * 100).toFixed(1)}%</p>
+            </div>
+            <div>
+              <p className="font-medium">Avg Time per Move:</p>
+              <p>{Math.round(metrics.memory.averageTimePerMove)}ms</p>
+            </div>
+            <div>
+              <p className="font-medium">Memory Effectiveness:</p>
+              <p>{(metrics.memory.memorizeEffectiveness * 100).toFixed(1)}%</p>
+            </div>
+            <div>
+              <p className="font-medium">First Half Performance:</p>
+              <p>
+                Accuracy: {(metrics.memory.performanceOverTime.firstHalf.accuracy * 100).toFixed(1)}%<br />
+                Speed: {Math.round(metrics.memory.performanceOverTime.firstHalf.speed)}ms
+              </p>
+            </div>
+            <div>
+              <p className="font-medium">Second Half Performance:</p>
+              <p>
+                Accuracy: {(metrics.memory.performanceOverTime.secondHalf.accuracy * 100).toFixed(1)}%<br />
+                Speed: {Math.round(metrics.memory.performanceOverTime.secondHalf.speed)}ms
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {metrics?.word && (
+        <div className="mb-4 p-4 bg-[#F3F4F6] rounded-lg">
+          <h3 className="text-lg font-semibold text-[#6D28D9] mb-2">Word Puzzle Metrics</h3>
+          
+          <div className="grid grid-cols-2 gap-4 mt-2">
+            <div>
+              <p className="font-medium">Total Time:</p>
+              <p>{(metrics.word.totalTime / 1000).toFixed(2)}s</p>
+            </div>
+            <div>
+              <p className="font-medium">Words Attempted:</p>
+              <p>{metrics.word.wordsAttempted}</p>
+            </div>
+            <div>
+              <p className="font-medium">Words Completed:</p>
+              <p>{metrics.word.wordsCompleted}</p>
+            </div>
+            <div>
+              <p className="font-medium">Incorrect Attempts:</p>
+              <p>{metrics.word.incorrectAttempts}</p>
+            </div>
+            <div>
+              <p className="font-medium">Accuracy:</p>
+              <p>{(metrics.word.accuracy * 100).toFixed(1)}%</p>
+            </div>
+            <div>
+              <p className="font-medium">Avg Time per Word:</p>
+              <p>{Math.round(metrics.word.averageTimePerWord)}ms</p>
+            </div>
+            <div>
+              <p className="font-medium">Longest Streak:</p>
+              <p>{metrics.word.longestStreak}</p>
+            </div>
+            <div>
+              <p className="font-medium">Final Streak:</p>
+              <p>{metrics.word.currentStreak}</p>
+            </div>
+            <div>
+              <p className="font-medium">First Half Performance:</p>
+              <p>
+                Accuracy: {(metrics.word.performanceOverTime.firstHalf.accuracy * 100).toFixed(1)}%<br />
+                Speed: {Math.round(metrics.word.performanceOverTime.firstHalf.speed)}ms
+              </p>
+            </div>
+            <div>
+              <p className="font-medium">Second Half Performance:</p>
+              <p>
+                Accuracy: {(metrics.word.performanceOverTime.secondHalf.accuracy * 100).toFixed(1)}%<br />
+                Speed: {Math.round(metrics.word.performanceOverTime.secondHalf.speed)}ms
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="mt-4 text-sm text-gray-600">
         <p>
           This report provides a general assessment of cognitive abilities based on game performance. For a
