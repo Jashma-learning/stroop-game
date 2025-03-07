@@ -22,10 +22,11 @@ const MEMORY_STORAGE_KEYS = {
   CARDS: "memory_cards",
   MATCHES: "memory_matches",
   IS_CHECKING: "memory_is_checking",
-  GAME_STATE: "memory_game_state"
+  GAME_STATE: "memory_game_state",
+  MEMORIZE_TIME: "memory_memorize_time"
 }
 
-type GameState = "ready" | "playing" | "complete"
+type GameState = "ready" | "memorizing" | "playing" | "complete"
 
 // Define card icons and colors
 const CARD_CONFIGS = [
@@ -105,6 +106,7 @@ export default function MemoryGame({ onComplete }: MemoryGameProps) {
   const [cards, setCards] = useState<MemoryCard[]>(createCards());
   const [matches, setMatches] = useState(0);
   const [isChecking, setIsChecking] = useState(false);
+  const [memorizeTimeLeft, setMemorizeTimeLeft] = useState(10);
   
   // Add CSS styles
   useEffect(() => {
@@ -129,6 +131,7 @@ export default function MemoryGame({ onComplete }: MemoryGameProps) {
         const savedGameState = sessionStorage.getItem(MEMORY_STORAGE_KEYS.GAME_STATE);
         const savedMatches = sessionStorage.getItem(MEMORY_STORAGE_KEYS.MATCHES);
         const savedCards = sessionStorage.getItem(MEMORY_STORAGE_KEYS.CARDS);
+        const savedMemorizeTime = sessionStorage.getItem(MEMORY_STORAGE_KEYS.MEMORIZE_TIME);
         
         if (savedGameState) {
           setGameState(savedGameState as GameState);
@@ -139,7 +142,6 @@ export default function MemoryGame({ onComplete }: MemoryGameProps) {
         }
         
         if (savedCards) {
-          // We need to restore the card objects which include functions
           const parsedCards = JSON.parse(savedCards);
           const restoredCards = parsedCards.map((card: any) => {
             const iconConfig = CARD_CONFIGS.find((_, i) => Math.floor(card.id / 2) === i);
@@ -149,6 +151,10 @@ export default function MemoryGame({ onComplete }: MemoryGameProps) {
             };
           });
           setCards(restoredCards);
+        }
+
+        if (savedMemorizeTime) {
+          setMemorizeTimeLeft(parseInt(savedMemorizeTime));
         }
       } catch (error) {
         console.error("Error loading Memory Game from session storage:", error);
@@ -162,12 +168,12 @@ export default function MemoryGame({ onComplete }: MemoryGameProps) {
       try {
         sessionStorage.setItem(MEMORY_STORAGE_KEYS.GAME_STATE, gameState);
         sessionStorage.setItem(MEMORY_STORAGE_KEYS.MATCHES, matches.toString());
+        sessionStorage.setItem(MEMORY_STORAGE_KEYS.MEMORIZE_TIME, memorizeTimeLeft.toString());
         
-        // Save card state without the icon function
         const serializableCards = cards.map(card => ({
           ...card,
           icon: undefined,
-          iconIndex: Math.floor(card.id / 2) // Store index to identify icon
+          iconIndex: Math.floor(card.id / 2)
         }));
         sessionStorage.setItem(MEMORY_STORAGE_KEYS.CARDS, JSON.stringify(serializableCards));
         sessionStorage.setItem(MEMORY_STORAGE_KEYS.IS_CHECKING, isChecking.toString());
@@ -175,7 +181,26 @@ export default function MemoryGame({ onComplete }: MemoryGameProps) {
         console.error("Error saving Memory Game to session storage:", error);
       }
     }
-  }, [gameState, matches, cards, isChecking]);
+  }, [gameState, matches, cards, isChecking, memorizeTimeLeft]);
+
+  // Memorization phase timer
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (gameState === "memorizing" && memorizeTimeLeft > 0) {
+      timer = setInterval(() => {
+        setMemorizeTimeLeft((prev) => {
+          if (prev <= 1) {
+            setGameState("playing");
+            // Flip all cards face down when memorization phase ends
+            setCards(cards.map(card => ({ ...card, isFlipped: false })));
+            return 10; // Reset for next game
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [gameState, memorizeTimeLeft, cards]);
 
   // Clear session storage
   const clearSessionStorage = useCallback(() => {
@@ -241,10 +266,12 @@ export default function MemoryGame({ onComplete }: MemoryGameProps) {
   };
 
   const startGame = useCallback(() => {
-    setGameState("playing");
-    setCards(createCards());
+    const newCards = createCards();
+    setGameState("memorizing");
+    setCards(newCards.map(card => ({ ...card, isFlipped: true }))); // Start with all cards face up
     setMatches(0);
     setIsChecking(false);
+    setMemorizeTimeLeft(10);
     clearSessionStorage();
   }, [clearSessionStorage]);
 
@@ -268,7 +295,7 @@ export default function MemoryGame({ onComplete }: MemoryGameProps) {
         <div className="text-center space-y-6">
           <div className="bg-[#F3F4F6] p-4 rounded-lg">
             <p className="mb-4">
-              Test your memory by finding all matching pairs of cards. Try to complete the game with as few moves as possible!
+              You'll have 10 seconds to memorize all cards before they flip face down. Then find all matching pairs!
             </p>
           </div>
           <Button onClick={startGame} className="w-full py-6 text-lg bg-[#1E3A8A] hover:bg-[#1E40AF]">
@@ -277,10 +304,13 @@ export default function MemoryGame({ onComplete }: MemoryGameProps) {
         </div>
       )}
 
-      {gameState === "playing" && (
+      {(gameState === "memorizing" || gameState === "playing") && (
         <div className="space-y-6">
           <div className="flex justify-between items-center">
             <p className="font-medium">Matches: {matches}/{CARD_CONFIGS.length}</p>
+            {gameState === "memorizing" && (
+              <p className="text-lg font-bold text-[#6D28D9]">Memorize: {memorizeTimeLeft}s</p>
+            )}
           </div>
 
           <div className="grid grid-cols-3 gap-3 md:gap-4">
@@ -288,11 +318,9 @@ export default function MemoryGame({ onComplete }: MemoryGameProps) {
               <div key={card.id} className="aspect-square h-24 md:h-28" onClick={() => handleCardClick(index)}>
                 <div className={`memory-card ${card.isFlipped || card.isMatched ? 'flipped' : ''}`}>
                   <div className="card-face front bg-[#F3F4F6] border border-[#E5E7EB] hover:border-[#1E3A8A] hover:bg-[#EDF2F7] rounded-md">
-                    {/* Card back - question mark or pattern */}
                     <div className="text-[#CBD5E1] text-2xl">?</div>
                   </div>
                   <div className={`card-face back ${card.isMatched ? 'bg-indigo-900/50 border-indigo-400/50' : 'bg-indigo-800/50 border-indigo-500/50'} rounded-md`}>
-                    {/* Card front - icon */}
                     <card.icon 
                       className={`w-10 h-10 ${card.color} ${card.isMatched ? 'drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]' : ''}`}
                     />

@@ -1,27 +1,73 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useCallback } from "react"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { Progress } from "@/components/ui/progress"
-import { Timer, Trophy, ArrowRight } from "lucide-react"
+import { useState, useEffect, useCallback } from "react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Timer, Trophy, ArrowRight } from "lucide-react";
 
-// Define the color palette
+// Define the color palette with proper typing
 const COLORS = {
   red: "#E53E3E",
   blue: "#1E3A8A", 
   green: "#10B981",
   yellow: "#F59E0B",
   orange: "#FB923C",
-}
+} as const;
 
 // Color names for the game
-const COLOR_NAMES = ["red", "blue", "green", "yellow", "orange"]
+const COLOR_NAMES = Object.keys(COLORS) as Array<keyof typeof COLORS>;
 
-type GameState = "ready" | "playing" | "gameOver"
+type GameState = "ready" | "playing" | "gameOver";
 
 interface StroopGameProps {
-  onComplete: (score: number) => void
+  onComplete: (score: number, metrics: StroopMetrics) => void;
+}
+
+// Cognitive metrics interface
+interface StroopMetrics {
+  totalTrials: number;
+  correctResponses: number;
+  incorrectResponses: number;
+  streak: number;
+  bestStreak: number;
+  avgReactionTime: number;
+  reactionTimes: number[];
+  congruentTrials: {
+    count: number;
+    correct: number;
+    avgReactionTime: number;
+    reactionTimes: number[];
+  };
+  incongruentTrials: {
+    count: number;
+    correct: number;
+    avgReactionTime: number;
+    reactionTimes: number[];
+  };
+  interferenceEffect: number; // Difference in reaction time between incongruent and congruent trials
+  errorRate: number;
+  performanceOverTime: {
+    firstHalf: {
+      accuracy: number;
+      avgReactionTime: number;
+    };
+    secondHalf: {
+      accuracy: number;
+      avgReactionTime: number;
+    };
+  };
+}
+
+// Trial data to track detailed metrics
+interface TrialData {
+  wordShown: keyof typeof COLORS;
+  colorShown: keyof typeof COLORS;
+  isCongruent: boolean;
+  response: keyof typeof COLORS;
+  isCorrect: boolean;
+  reactionTime: number;
+  timestamp: number;
 }
 
 // Session storage keys for this game
@@ -32,166 +78,211 @@ const STROOP_SESSION_KEYS = {
   CURRENT_WORD: "stroop_current_word",
   CURRENT_COLOR: "stroop_current_color",
   STREAK: "stroop_streak",
-  BEST_STREAK: "stroop_best_streak"
-}
+  BEST_STREAK: "stroop_best_streak",
+  TRIAL_DATA: "stroop_trial_data",
+};
 
 export default function StroopGame({ onComplete }: StroopGameProps) {
-  const [gameState, setGameState] = useState<GameState>("ready")
-  const [score, setScore] = useState(0)
-  const [timeLeft, setTimeLeft] = useState(30) // Reduced time for the game series
-  const [currentWord, setCurrentWord] = useState("")
-  const [currentColor, setCurrentColor] = useState("")
-  const [streak, setStreak] = useState(0)
-  const [bestStreak, setBestStreak] = useState(0)
+  const [gameState, setGameState] = useState<GameState>("ready");
+  const [score, setScore] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(30);
+  const [currentWord, setCurrentWord] = useState<keyof typeof COLORS>("red");
+  const [currentColor, setCurrentColor] = useState<keyof typeof COLORS>("red");
+  const [streak, setStreak] = useState(0);
+  const [bestStreak, setBestStreak] = useState(0);
+  const [startTime, setStartTime] = useState<number | null>(null);
+  
+  // Store detailed trial data for metrics
+  const [trialData, setTrialData] = useState<TrialData[]>([]);
+  const [totalTrials, setTotalTrials] = useState(0);
 
-  // Generate a new challenge
   const generateChallenge = useCallback(() => {
-    const randomWordIndex = Math.floor(Math.random() * COLOR_NAMES.length)
-    const randomColorIndex = Math.floor(Math.random() * COLOR_NAMES.length)
+    const randomWordIndex = Math.floor(Math.random() * COLOR_NAMES.length);
+    const randomColorIndex = Math.floor(Math.random() * COLOR_NAMES.length);
+    const shouldBeDifferent = Math.random() < 0.7;
+    const finalColorIndex = shouldBeDifferent && randomWordIndex === randomColorIndex
+      ? (randomColorIndex + 1) % COLOR_NAMES.length
+      : randomColorIndex;
 
-    // Ensure the word and color are different at least 70% of the time to make it challenging
-    const shouldBeDifferent = Math.random() < 0.7
-    const finalColorIndex =
-      shouldBeDifferent && randomWordIndex === randomColorIndex
-        ? (randomColorIndex + 1) % COLOR_NAMES.length
-        : randomColorIndex
+    const wordToShow = COLOR_NAMES[randomWordIndex];
+    const colorToShow = COLOR_NAMES[finalColorIndex];
 
-    setCurrentWord(COLOR_NAMES[randomWordIndex])
-    setCurrentColor(COLOR_NAMES[finalColorIndex])
-  }, [])
-
-  // Load saved state from session storage on initial render
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const savedGameState = sessionStorage.getItem(STROOP_SESSION_KEYS.GAME_STATE) as GameState | null
-        const savedScore = sessionStorage.getItem(STROOP_SESSION_KEYS.SCORE)
-        const savedTimeLeft = sessionStorage.getItem(STROOP_SESSION_KEYS.TIME_LEFT)
-        const savedCurrentWord = sessionStorage.getItem(STROOP_SESSION_KEYS.CURRENT_WORD)
-        const savedCurrentColor = sessionStorage.getItem(STROOP_SESSION_KEYS.CURRENT_COLOR)
-        const savedStreak = sessionStorage.getItem(STROOP_SESSION_KEYS.STREAK)
-        const savedBestStreak = sessionStorage.getItem(STROOP_SESSION_KEYS.BEST_STREAK)
-
-        if (savedGameState) {
-          setGameState(savedGameState as GameState)
-        }
-        
-        if (savedScore) {
-          setScore(parseInt(savedScore))
-        }
-        
-        if (savedTimeLeft) {
-          setTimeLeft(parseInt(savedTimeLeft))
-        }
-        
-        if (savedCurrentWord) {
-          setCurrentWord(savedCurrentWord)
-        }
-        
-        if (savedCurrentColor) {
-          setCurrentColor(savedCurrentColor)
-        }
-        
-        if (savedStreak) {
-          setStreak(parseInt(savedStreak))
-        }
-        
-        if (savedBestStreak) {
-          setBestStreak(parseInt(savedBestStreak))
-        }
-        
-        // If we have a saved game but no challenge, generate one
-        if (savedGameState === "playing" && (!savedCurrentWord || !savedCurrentColor)) {
-          generateChallenge()
-        }
-      } catch (error) {
-        console.error("Error loading Stroop game from session storage:", error)
-        // Continue with default state if there's an error
-      }
-    }
-  }, [generateChallenge])
-
-  // Update session storage when state changes
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem(STROOP_SESSION_KEYS.GAME_STATE, gameState)
-      sessionStorage.setItem(STROOP_SESSION_KEYS.SCORE, score.toString())
-      sessionStorage.setItem(STROOP_SESSION_KEYS.TIME_LEFT, timeLeft.toString())
-      sessionStorage.setItem(STROOP_SESSION_KEYS.CURRENT_WORD, currentWord)
-      sessionStorage.setItem(STROOP_SESSION_KEYS.CURRENT_COLOR, currentColor)
-      sessionStorage.setItem(STROOP_SESSION_KEYS.STREAK, streak.toString())
-      sessionStorage.setItem(STROOP_SESSION_KEYS.BEST_STREAK, bestStreak.toString())
-    }
-  }, [gameState, score, timeLeft, currentWord, currentColor, streak, bestStreak])
+    setCurrentWord(wordToShow);
+    setCurrentColor(colorToShow);
+    setStartTime(Date.now());
+  }, []);
 
   // Start the game
   const startGame = () => {
-    setGameState("playing")
-    setScore(0)
-    setTimeLeft(30) // Reduced time for the game series
-    setStreak(0)
-    generateChallenge()
+    setGameState("playing");
+    setScore(0);
+    setTimeLeft(30);
+    setStreak(0);
+    setTrialData([]);
+    setTotalTrials(0);
+    generateChallenge();
     
-    // Clear previous session data for this game
-    if (typeof window !== 'undefined') {
-      Object.values(STROOP_SESSION_KEYS).forEach(key => {
-        sessionStorage.removeItem(key)
-      })
-    }
-  }
+    // Start timer
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setGameState("gameOver");
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
 
-  // Handle user selection
-  const handleColorSelect = (selectedColor: string) => {
-    if (selectedColor === currentColor) {
-      setScore(score + 1)
-      setStreak(streak + 1)
+    return () => clearInterval(timer);
+  };
+
+  // Save trial data to session storage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem(STROOP_SESSION_KEYS.TRIAL_DATA, JSON.stringify(trialData));
+    }
+  }, [trialData]);
+
+  const handleColorSelect = (selectedColor: keyof typeof COLORS) => {
+    if (!startTime) return;
+    
+    const reactionTime = Date.now() - startTime;
+    const isCorrect = selectedColor === currentColor;
+    const isCongruent = currentWord === currentColor;
+    
+    // Record this trial
+    const trial: TrialData = {
+      wordShown: currentWord,
+      colorShown: currentColor,
+      isCongruent,
+      response: selectedColor,
+      isCorrect,
+      reactionTime,
+      timestamp: Date.now(),
+    };
+    
+    setTrialData(prev => [...prev, trial]);
+    setTotalTrials(prev => prev + 1);
+
+    // Update score and streak
+    if (isCorrect) {
+      setScore(score + 1);
+      setStreak(streak + 1);
       if (streak + 1 > bestStreak) {
-        setBestStreak(streak + 1)
+        setBestStreak(streak + 1);
       }
     } else {
-      setStreak(0)
+      setStreak(0);
     }
-    generateChallenge()
-  }
+    
+    // Generate next challenge
+    generateChallenge();
+  };
 
-  // Move to next game
+  // Calculate all the cognitive metrics
+  const calculateMetrics = (): StroopMetrics => {
+    // Basic metrics
+    const correctResponses = trialData.filter(trial => trial.isCorrect).length;
+    const incorrectResponses = trialData.length - correctResponses;
+    const allReactionTimes = trialData.map(trial => trial.reactionTime);
+    const avgReactionTime = allReactionTimes.length > 0 
+      ? allReactionTimes.reduce((sum, time) => sum + time, 0) / allReactionTimes.length 
+      : 0;
+    
+    // Congruent trials
+    const congruentTrials = trialData.filter(trial => trial.isCongruent);
+    const congruentCorrect = congruentTrials.filter(trial => trial.isCorrect).length;
+    const congruentReactionTimes = congruentTrials.map(trial => trial.reactionTime);
+    const avgCongruentRT = congruentReactionTimes.length > 0
+      ? congruentReactionTimes.reduce((sum, time) => sum + time, 0) / congruentReactionTimes.length
+      : 0;
+    
+    // Incongruent trials
+    const incongruentTrials = trialData.filter(trial => !trial.isCongruent);
+    const incongruentCorrect = incongruentTrials.filter(trial => trial.isCorrect).length;
+    const incongruentReactionTimes = incongruentTrials.map(trial => trial.reactionTime);
+    const avgIncongruentRT = incongruentReactionTimes.length > 0
+      ? incongruentReactionTimes.reduce((sum, time) => sum + time, 0) / incongruentReactionTimes.length
+      : 0;
+    
+    // Interference effect
+    const interferenceEffect = avgIncongruentRT - avgCongruentRT;
+    
+    // Error rate
+    const errorRate = trialData.length > 0 ? incorrectResponses / trialData.length : 0;
+    
+    // Performance over time (first half vs second half)
+    const halfwayIndex = Math.floor(trialData.length / 2);
+    const firstHalf = trialData.slice(0, halfwayIndex);
+    const secondHalf = trialData.slice(halfwayIndex);
+    
+    const firstHalfAccuracy = firstHalf.length > 0
+      ? firstHalf.filter(trial => trial.isCorrect).length / firstHalf.length
+      : 0;
+    const secondHalfAccuracy = secondHalf.length > 0
+      ? secondHalf.filter(trial => trial.isCorrect).length / secondHalf.length
+      : 0;
+    
+    const firstHalfRT = firstHalf.length > 0
+      ? firstHalf.reduce((sum, trial) => sum + trial.reactionTime, 0) / firstHalf.length
+      : 0;
+    const secondHalfRT = secondHalf.length > 0
+      ? secondHalf.reduce((sum, trial) => sum + trial.reactionTime, 0) / secondHalf.length
+      : 0;
+    
+    return {
+      totalTrials: trialData.length,
+      correctResponses,
+      incorrectResponses,
+      streak,
+      bestStreak,
+      avgReactionTime,
+      reactionTimes: allReactionTimes,
+      congruentTrials: {
+        count: congruentTrials.length,
+        correct: congruentCorrect,
+        avgReactionTime: avgCongruentRT,
+        reactionTimes: congruentReactionTimes,
+      },
+      incongruentTrials: {
+        count: incongruentTrials.length,
+        correct: incongruentCorrect,
+        avgReactionTime: avgIncongruentRT,
+        reactionTimes: incongruentReactionTimes,
+      },
+      interferenceEffect,
+      errorRate,
+      performanceOverTime: {
+        firstHalf: {
+          accuracy: firstHalfAccuracy,
+          avgReactionTime: firstHalfRT,
+        },
+        secondHalf: {
+          accuracy: secondHalfAccuracy,
+          avgReactionTime: secondHalfRT,
+        },
+      },
+    };
+  };
+
   const handleNextGame = () => {
-    // Clear session storage for this game when moving to the next game
-    if (typeof window !== 'undefined') {
-      Object.values(STROOP_SESSION_KEYS).forEach(key => {
-        sessionStorage.removeItem(key)
-      })
+    if (typeof window !== "undefined") {
+      Object.values(STROOP_SESSION_KEYS).forEach((key) => {
+        sessionStorage.removeItem(key);
+      });
     }
-    onComplete(score)
-  }
-
-  // Timer effect
-  useEffect(() => {
-    let timer: NodeJS.Timeout
-
-    if (gameState === "playing") {
-      timer = setInterval(() => {
-        setTimeLeft((prevTime) => {
-          if (prevTime <= 1) {
-            clearInterval(timer)
-            setGameState("gameOver")
-            return 0
-          }
-          return prevTime - 1
-        })
-      }, 1000)
-    }
-
-    return () => clearInterval(timer)
-  }, [gameState])
+    
+    // Calculate final metrics and pass to onComplete callback
+    const metrics = calculateMetrics();
+    onComplete(score, metrics);
+  };
 
   return (
     <Card className="w-full p-6 shadow-xl bg-white">
       <div className="text-center mb-6">
         <h1 className="text-3xl font-bold text-[#1E3A8A] mb-2">Stroop Challenge</h1>
-        <p className="text-gray-600">
-          Game 1 of 3: Select the <strong>color</strong> of the text, not what it says!
-        </p>
+        <p className="text-gray-600">Select the <strong>color</strong> of the text, not what it says!</p>
       </div>
 
       {gameState === "ready" && (
@@ -228,21 +319,18 @@ export default function StroopGame({ onComplete }: StroopGameProps) {
           <Progress value={(timeLeft / 30) * 100} className="mb-6" />
 
           <div className="flex justify-center items-center h-32 mb-8 bg-[#F3F4F6] rounded-lg">
-            <span className="text-5xl font-bold" style={{ color: COLORS[currentColor as keyof typeof COLORS] }}>
+            <span className="text-5xl font-bold" style={{ color: COLORS[currentColor] }}>
               {currentWord.toUpperCase()}
             </span>
           </div>
 
           <div className="grid grid-cols-3 gap-3">
             {COLOR_NAMES.map((color) => (
-              <Button
-                key={color}
-                onClick={() => handleColorSelect(color)}
-                className="py-6"
-                style={{
-                  backgroundColor: COLORS[color as keyof typeof COLORS],
-                  borderColor: COLORS[color as keyof typeof COLORS],
-                }}
+              <Button 
+                key={color} 
+                onClick={() => handleColorSelect(color)} 
+                className="py-6" 
+                style={{ backgroundColor: COLORS[color] }}
               >
                 <span className="sr-only">{color}</span>
               </Button>
@@ -261,22 +349,24 @@ export default function StroopGame({ onComplete }: StroopGameProps) {
               <p className="text-4xl font-bold text-[#E53E3E]">{score}</p>
             </div>
 
-            <div className="text-sm">
-              <p className="font-medium">Best Streak</p>
-              <p className="text-xl font-bold text-[#10B981]">{bestStreak}</p>
+            <div className="text-sm grid grid-cols-2 gap-4">
+              <div>
+                <p className="font-medium">Total Trials</p>
+                <p className="text-xl font-bold text-[#10B981]">{totalTrials}</p>
+              </div>
+              <div>
+                <p className="font-medium">Best Streak</p>
+                <p className="text-xl font-bold text-[#10B981]">{bestStreak}</p>
+              </div>
             </div>
           </div>
 
-          <Button
-            onClick={handleNextGame}
-            className="w-full py-6 text-lg bg-[#1E3A8A] hover:bg-[#1E40AF] flex items-center justify-center"
-          >
-            Next Game: Tower of Hanoi
+          <Button onClick={handleNextGame} className="w-full py-6 text-lg bg-[#1E3A8A] hover:bg-[#1E40AF]">
+            Next Game
             <ArrowRight className="w-5 h-5 ml-2" />
           </Button>
         </div>
       )}
     </Card>
-  )
+  );
 }
-

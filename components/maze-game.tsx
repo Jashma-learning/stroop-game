@@ -5,7 +5,40 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 
 interface MazeGameProps {
-  onComplete: (score: number) => void;
+  onComplete: (score: number, metrics: MazeMetrics) => void;
+}
+
+// Cognitive metrics interface for maze navigation
+interface MazeMetrics {
+  completionTime: number;
+  totalMoves: number;
+  wallCollisions: number;
+  backtrackCount: number;
+  pathLength: number;
+  optimalPathLength: number;
+  pathEfficiency: number;
+  averageTimePerMove: number;
+  movementPatterns: {
+    up: number;
+    down: number;
+    left: number;
+    right: number;
+  };
+  heatmap: number[][];  // Represents visited cell frequency
+  performanceOverTime: {
+    firstHalf: {
+      speed: number;  // Average time per move
+      accuracy: number;  // Fewer wall collisions
+    };
+    secondHalf: {
+      speed: number;
+      accuracy: number;
+    };
+  };
+  // New path analysis metrics
+  pathDeviation: number;  // Number of moves deviating from optimal path
+  optimalPath: Point[];  // The calculated optimal path
+  actualPath: Point[];   // The path actually taken by the player
 }
 
 const MAZE_SIZE = 21; // Ensure odd number for better maze structure
@@ -77,6 +110,73 @@ const clearMazeStorage = () => {
   });
 };
 
+interface Point {
+  x: number;
+  y: number;
+}
+
+interface QueueItem {
+  point: Point;
+  path: Point[];
+}
+
+const findOptimalPath = (maze: string[][], start: Point, end: Point): Point[] => {
+  const queue: QueueItem[] = [{ point: start, path: [start] }];
+  const visited = new Set<string>();
+  const directions = [
+    { x: 0, y: -1 }, // up
+    { x: 0, y: 1 },  // down
+    { x: -1, y: 0 }, // left
+    { x: 1, y: 0 }   // right
+  ];
+
+  visited.add(`${start.x},${start.y}`);
+
+  while (queue.length > 0) {
+    const { point, path } = queue.shift()!;
+    
+    if (point.x === end.x && point.y === end.y) {
+      return path;
+    }
+
+    for (const dir of directions) {
+      const newX = point.x + dir.x;
+      const newY = point.y + dir.y;
+      const newPoint = { x: newX, y: newY };
+      const key = `${newX},${newY}`;
+
+      if (
+        newX >= 0 && newX < MAZE_SIZE &&
+        newY >= 0 && newY < MAZE_SIZE &&
+        maze[newY][newX] !== WALL &&
+        !visited.has(key)
+      ) {
+        visited.add(key);
+        queue.push({
+          point: newPoint,
+          path: [...path, newPoint]
+        });
+      }
+    }
+  }
+
+  return []; // No path found
+};
+
+const calculatePathDeviation = (optimalPath: Point[], actualPath: Point[]): number => {
+  // Create sets of position strings for easy comparison
+  const optimalSet = new Set(optimalPath.map(p => `${p.x},${p.y}`));
+  const actualSet = new Set(actualPath.map(p => `${p.x},${p.y}`));
+
+  // Calculate positions in actual path but not in optimal path
+  const extraMoves = [...actualSet].filter(pos => !optimalSet.has(pos)).length;
+
+  // Calculate positions in optimal path but not taken in actual path
+  const missedMoves = [...optimalSet].filter(pos => !actualSet.has(pos)).length;
+
+  return extraMoves + missedMoves;
+};
+
 export default function MazeGame({ onComplete }: MazeGameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [maze, setMaze] = useState(() => {
@@ -109,25 +209,57 @@ export default function MazeGame({ onComplete }: MazeGameProps) {
     return { x: 1, y: 1 };
   });
   
-  const [gameComplete, setGameComplete] = useState(() => {
-    // Try to load game complete state from session storage
-    if (typeof window !== 'undefined') {
-      try {
-        const savedGameComplete = sessionStorage.getItem(MAZE_STORAGE_KEYS.GAME_COMPLETE);
-        if (savedGameComplete) {
-          return JSON.parse(savedGameComplete);
-        }
-      } catch (error) {
-        console.error("Error loading game complete state from session storage:", error);
-      }
-    }
-    return false;
+  const [gameState, setGameState] = useState<"ready" | "playing" | "gameOver">("ready");
+  const [score, setScore] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(60);
+  
+  // Metrics tracking state
+  const [startTime, setStartTime] = useState<number>(0);
+  const [moveCount, setMoveCount] = useState(0);
+  const [wallCollisions, setWallCollisions] = useState(0);
+  const [backtrackCount, setBacktrackCount] = useState(0);
+  const [movementHistory, setMovementHistory] = useState<string[]>([]);
+  const [visitedCells, setVisitedCells] = useState<Set<string>>(new Set());
+  const [movePatterns, setMovePatterns] = useState({
+    up: 0,
+    down: 0,
+    left: 0,
+    right: 0,
   });
+  const [firstHalfMetrics, setFirstHalfMetrics] = useState({
+    moves: 0,
+    collisions: 0,
+    time: 0,
+  });
+  const [heatmap, setHeatmap] = useState<number[][]>([]);
+
+  // Add these new state variables
+  const [optimalPath, setOptimalPath] = useState<Point[]>([]);
+  const [actualPath, setActualPath] = useState<Point[]>([]);
+  const [pathDeviation, setPathDeviation] = useState(0);
 
   // Save game state to session storage whenever it changes
   useEffect(() => {
-    saveMazeToStorage(maze, playerPos, gameComplete);
-  }, [maze, playerPos, gameComplete]);
+    saveMazeToStorage(maze, playerPos, gameState === "gameOver");
+  }, [maze, playerPos, gameState]);
+
+  // Timer effect
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (gameState === "playing") {
+      timer = setInterval(() => {
+        setTimeLeft((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            setGameState("gameOver");
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [gameState]);
 
   const drawMaze = useCallback(() => {
     if (!canvasRef.current) return;
@@ -137,6 +269,7 @@ export default function MazeGame({ onComplete }: MazeGameProps) {
     canvas.height = MAZE_SIZE * CELL_SIZE;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    // Draw the base maze
     for (let y = 0; y < MAZE_SIZE; y++) {
       for (let x = 0; x < MAZE_SIZE; x++) {
         ctx.fillStyle = COLORS[maze[y][x] as keyof typeof COLORS] || COLORS.PATH;
@@ -150,12 +283,14 @@ export default function MazeGame({ onComplete }: MazeGameProps) {
       }
     }
 
+    // Draw start and end positions
     ctx.fillStyle = COLORS.START;
     ctx.fillRect(1 * CELL_SIZE, 1 * CELL_SIZE, CELL_SIZE, CELL_SIZE);
     
     ctx.fillStyle = COLORS.END;
     ctx.fillRect((MAZE_SIZE - 2) * CELL_SIZE, (MAZE_SIZE - 2) * CELL_SIZE, CELL_SIZE, CELL_SIZE);
     
+    // Draw the player
     ctx.fillStyle = COLORS.PLAYER;
     ctx.beginPath();
     ctx.arc(
@@ -166,6 +301,7 @@ export default function MazeGame({ onComplete }: MazeGameProps) {
       Math.PI * 2
     );
     ctx.fill();
+
   }, [maze, playerPos]);
 
   useEffect(() => {
@@ -173,56 +309,250 @@ export default function MazeGame({ onComplete }: MazeGameProps) {
   }, [drawMaze]);
 
   const resetGame = useCallback(() => {
-    const newMaze = generateMaze();
-    setMaze(newMaze);
-    setPlayerPos({ x: 1, y: 1 });
-    setGameComplete(false);
-    clearMazeStorage();
+    startGame();
   }, []);
 
-  const movePlayer = useCallback((dx: number, dy: number) => {
-    const newX = playerPos.x + dx;
-    const newY = playerPos.y + dy;
+  const startGame = () => {
+    const newMaze = generateMaze();
+    setMaze(newMaze);
+    const startPoint = { x: 1, y: 1 };
+    const endPoint = { x: MAZE_SIZE - 2, y: MAZE_SIZE - 2 };
+    
+    // Calculate optimal path at the start
+    const optimal = findOptimalPath(newMaze, startPoint, endPoint);
+    setOptimalPath(optimal);
+    
+    setPlayerPos(startPoint);
+    setActualPath([startPoint]);
+    setPathDeviation(0);
+    setGameState("playing");
+    setTimeLeft(60);
+    setScore(0);
+    // Initialize metrics
+    setStartTime(Date.now());
+    setMoveCount(0);
+    setWallCollisions(0);
+    setBacktrackCount(0);
+    setMovementHistory([]);
+    setVisitedCells(new Set(['1,1']));
+    setMovePatterns({ up: 0, down: 0, left: 0, right: 0 });
+    setFirstHalfMetrics({ moves: 0, collisions: 0, time: 0 });
+    setHeatmap(Array(MAZE_SIZE).fill(0).map(() => Array(MAZE_SIZE).fill(0)));
+    clearMazeStorage();
+  };
 
-    if (newX < 0 || newY < 0 || newX >= MAZE_SIZE || newY >= MAZE_SIZE) return;
-    if (maze[newY][newX] === WALL) return;
+  const handleMove = useCallback((direction: { x: number; y: number }, key: string) => {
+    if (gameState !== "playing") return;
 
-    setPlayerPos({ x: newX, y: newY });
-    if (maze[newY][newX] === EXIT) {
-      setGameComplete(true);
-      // Clear storage when game is complete
-      clearMazeStorage();
-      setTimeout(() => onComplete(1000), 500);
+    const newPos = {
+      x: playerPos.x + direction.x,
+      y: playerPos.y + direction.y,
+    };
+
+    // Update movement patterns
+    const directionKey = key.replace('Arrow', '').toLowerCase() as 'up' | 'down' | 'left' | 'right';
+    setMovePatterns(prev => ({
+      ...prev,
+      [directionKey]: prev[directionKey] + 1
+    }));
+
+    // Check for wall collision
+    if (maze[newPos.y][newPos.x] === WALL) {
+      setWallCollisions(prev => prev + 1);
+      return;
     }
-  }, [playerPos, maze, onComplete]);
+
+    // Check for backtracking
+    const newPosKey = `${newPos.x},${newPos.y}`;
+    if (visitedCells.has(newPosKey)) {
+      setBacktrackCount(prev => prev + 1);
+    }
+
+    // Update visited cells and heatmap
+    setVisitedCells(prev => new Set([...prev, newPosKey]));
+    setHeatmap(prev => {
+      const newHeatmap = [...prev];
+      newHeatmap[newPos.y][newPos.x]++;
+      return newHeatmap;
+    });
+
+    // Track movement history
+    setMovementHistory(prev => [...prev, directionKey]);
+    setMoveCount(prev => prev + 1);
+
+    // Update actual path
+    setActualPath(prev => [...prev, newPos]);
+
+    // Update position
+    setPlayerPos(newPos);
+
+    // Check if halfway point and update metrics
+    if (moveCount === Math.floor(MAZE_SIZE * MAZE_SIZE / 2)) {
+      setFirstHalfMetrics({
+        moves: moveCount,
+        collisions: wallCollisions,
+        time: Date.now() - startTime,
+      });
+    }
+
+    // Check for maze completion
+    if (newPos.x === MAZE_SIZE - 2 && newPos.y === MAZE_SIZE - 2) {
+      const endTime = Date.now();
+      const totalTime = endTime - startTime;
+      
+      // Calculate final path deviation
+      const finalDeviation = calculatePathDeviation(optimalPath, [...actualPath, newPos]);
+      setPathDeviation(finalDeviation);
+      
+      // Calculate metrics
+      const metrics: MazeMetrics & { 
+        optimalPath: Point[];
+        actualPath: Point[];
+        pathDeviation: number;
+      } = {
+        completionTime: totalTime,
+        totalMoves: moveCount + 1,
+        wallCollisions,
+        backtrackCount,
+        pathLength: movementHistory.length + 1,
+        optimalPathLength: optimalPath.length,
+        pathEfficiency: optimalPath.length / (movementHistory.length + 1),
+        pathDeviation: finalDeviation,
+        optimalPath,
+        actualPath: [...actualPath, newPos],
+        averageTimePerMove: totalTime / (moveCount + 1),
+        movementPatterns: movePatterns,
+        heatmap,
+        performanceOverTime: {
+          firstHalf: {
+            speed: firstHalfMetrics.moves > 0 ? firstHalfMetrics.time / firstHalfMetrics.moves : 0,
+            accuracy: firstHalfMetrics.moves > 0 ? 1 - (firstHalfMetrics.collisions / firstHalfMetrics.moves) : 0,
+          },
+          secondHalf: {
+            speed: (totalTime - firstHalfMetrics.time) / (moveCount - firstHalfMetrics.moves),
+            accuracy: 1 - ((wallCollisions - firstHalfMetrics.collisions) / (moveCount - firstHalfMetrics.moves)),
+          },
+        },
+      };
+
+      setGameState("gameOver");
+      // Calculate score based on metrics
+      const timeBonus = Math.max(0, Math.floor((60 - totalTime / 1000) * 10));
+      const efficiencyBonus = Math.floor(metrics.pathEfficiency * 500);
+      const accuracyBonus = Math.floor((1 - metrics.wallCollisions / metrics.totalMoves) * 300);
+      const finalScore = Math.max(100, timeBonus + efficiencyBonus + accuracyBonus);
+      setScore(finalScore);
+      
+      // Clear storage and complete game
+      clearMazeStorage();
+      setTimeout(() => onComplete(finalScore, metrics), 500);
+    }
+  }, [gameState, maze, playerPos, moveCount, wallCollisions, movementHistory, visitedCells, movePatterns, startTime, firstHalfMetrics, heatmap, onComplete, optimalPath, actualPath]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (gameComplete) return;
+      if (gameState !== "playing") return;
+      
       switch (event.key) {
-        case "ArrowUp": movePlayer(0, -1); break;
-        case "ArrowDown": movePlayer(0, 1); break;
-        case "ArrowLeft": movePlayer(-1, 0); break;
-        case "ArrowRight": movePlayer(1, 0); break;
-        case "r": resetGame(); break; // Add 'r' key to reset the game
+        case "ArrowUp": handleMove({ x: 0, y: -1 }, event.key); break;
+        case "ArrowDown": handleMove({ x: 0, y: 1 }, event.key); break;
+        case "ArrowLeft": handleMove({ x: -1, y: 0 }, event.key); break;
+        case "ArrowRight": handleMove({ x: 1, y: 0 }, event.key); break;
+        case "r": resetGame(); break;
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [movePlayer, gameComplete, resetGame]);
+  }, [handleMove, gameState, resetGame]);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-[#F3F4F6] py-4">
       <h2 className="text-3xl font-bold text-[#1E3A8A] mb-2">Maze Navigator</h2>
-      {gameComplete ? (
-        <p className="text-[#E53E3E] font-bold mb-4">You reached the exit!</p>
-      ) : (
-        <div className="text-center mb-2">
-          <p className="text-[#1E3A8A]">Use Arrow Keys to Move</p>
-          <p className="text-sm text-gray-500">Press 'R' to reset the maze</p>
+      
+      {gameState === "ready" && (
+        <div className="text-center space-y-6">
+          <div className="bg-[#F3F4F6] p-4 rounded-lg">
+            <p className="mb-4">Navigate through the maze using arrow keys. Reach the exit before time runs out!</p>
+            <p>You have 60 seconds. Try to find the most efficient path!</p>
+          </div>
+          <Button onClick={startGame} className="w-full py-6 text-lg bg-[#1E3A8A] hover:bg-[#1E40AF]">
+            Start Game
+          </Button>
         </div>
       )}
-      <canvas ref={canvasRef} className="border-4 border-[#1E3A8A] bg-[#F3F4F6]" style={{ width: MAZE_SIZE * CELL_SIZE, height: MAZE_SIZE * CELL_SIZE }} />
+
+      {gameState === "playing" && (
+        <>
+          <div className="text-center mb-4">
+            <div className="flex justify-between items-center w-full max-w-md mb-2">
+              <span className="font-bold">Time: {timeLeft}s</span>
+              <span className="font-bold">Moves: {moveCount}</span>
+            </div>
+            <p className="text-[#1E3A8A]">Use Arrow Keys to Move</p>
+            <p className="text-sm text-gray-500">Press 'R' to reset the maze</p>
+          </div>
+          <canvas 
+            ref={canvasRef} 
+            className="border-4 border-[#1E3A8A] bg-[#F3F4F6]" 
+            style={{ width: MAZE_SIZE * CELL_SIZE, height: MAZE_SIZE * CELL_SIZE }} 
+          />
+        </>
+      )}
+
+      {gameState === "gameOver" && (
+        <div className="text-center space-y-6">
+          <h2 className="text-2xl font-bold text-[#1E3A8A]">Game Complete!</h2>
+          <div className="bg-[#F3F4F6] p-6 rounded-lg">
+            <div className="mb-4">
+              <p className="text-lg font-semibold">Your Score</p>
+              <p className="text-4xl font-bold text-[#6D28D9]">{score}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="font-medium">Total Moves</p>
+                <p className="text-xl font-bold text-[#14B8A6]">{moveCount}</p>
+              </div>
+              <div>
+                <p className="font-medium">Wall Collisions</p>
+                <p className="text-xl font-bold text-[#14B8A6]">{wallCollisions}</p>
+              </div>
+            </div>
+          </div>
+          <Button onClick={() => startGame()} className="w-full py-6 text-lg bg-[#1E3A8A] hover:bg-[#1E40AF]">
+            Try Again
+          </Button>
+          <Button onClick={() => onComplete(score, {
+            completionTime: Date.now() - startTime,
+            totalMoves: moveCount,
+            wallCollisions,
+            backtrackCount,
+            pathLength: movementHistory.length,
+            optimalPathLength: optimalPath.length,
+            pathEfficiency: optimalPath.length / movementHistory.length,
+            averageTimePerMove: (Date.now() - startTime) / moveCount,
+            movementPatterns: movePatterns,
+            heatmap,
+            performanceOverTime: {
+              firstHalf: {
+                speed: firstHalfMetrics.moves > 0 ? firstHalfMetrics.time / firstHalfMetrics.moves : 0,
+                accuracy: firstHalfMetrics.moves > 0 ? 1 - (firstHalfMetrics.collisions / firstHalfMetrics.moves) : 0,
+              },
+              secondHalf: {
+                speed: moveCount > firstHalfMetrics.moves ? 
+                  (Date.now() - startTime - firstHalfMetrics.time) / (moveCount - firstHalfMetrics.moves) : 0,
+                accuracy: moveCount > firstHalfMetrics.moves ? 
+                  1 - ((wallCollisions - firstHalfMetrics.collisions) / (moveCount - firstHalfMetrics.moves)) : 0,
+              },
+            },
+            pathDeviation: pathDeviation,
+            optimalPath,
+            actualPath: [...actualPath, { x: MAZE_SIZE - 2, y: MAZE_SIZE - 2 }],
+          })} className="w-full py-6 text-lg bg-[#6D28D9] hover:bg-[#5B21B6]">
+            Next Game
+            <ArrowRight className="w-5 h-5 ml-2" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

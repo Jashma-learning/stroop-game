@@ -7,7 +7,46 @@ import { Progress } from "@/components/ui/progress"
 import { Timer, ArrowRight, RotateCcw } from "lucide-react"
 
 interface TowerOfHanoiProps {
-  onComplete: (score: number) => void
+  onComplete: (score: number, metrics: HanoiMetrics) => void
+}
+
+// Cognitive metrics interface for Tower of Hanoi
+interface HanoiMetrics {
+  completionTime: number;
+  totalMoves: number;
+  optimalMoves: number;
+  moveEfficiency: number;  // ratio of optimal to actual moves
+  averageTimePerMove: number;
+  invalidMoves: number;  // attempts to make illegal moves
+  movePattern: {
+    tower1to2: number;
+    tower1to3: number;
+    tower2to1: number;
+    tower2to3: number;
+    tower3to1: number;
+    tower3to2: number;
+  };
+  performanceOverTime: {
+    firstHalf: {
+      speed: number;      // average time per move
+      accuracy: number;   // ratio of valid to invalid moves
+    };
+    secondHalf: {
+      speed: number;
+      accuracy: number;
+    };
+  };
+  moveSequence: Array<{
+    from: number;
+    to: number;
+    diskSize: number;
+    timeStamp: number;
+  }>;
+  planningTime: number;  // time taken before first move
+  towerStates: Array<{
+    towers: number[][];
+    timeStamp: number;
+  }>;
 }
 
 // Disk sizes and colors
@@ -83,6 +122,26 @@ export default function TowerOfHanoi({ onComplete }: TowerOfHanoiProps) {
   
   const optimalMoves = 7 // 2^n - 1 where n is the number of disks (3)
 
+  // Add new metrics tracking state
+  const [startTime, setStartTime] = useState<number>(0);
+  const [firstMoveTime, setFirstMoveTime] = useState<number>(0);
+  const [moveSequence, setMoveSequence] = useState<HanoiMetrics['moveSequence']>([]);
+  const [invalidMoves, setInvalidMoves] = useState(0);
+  const [towerStates, setTowerStates] = useState<HanoiMetrics['towerStates']>([]);
+  const [movePattern, setMovePattern] = useState<HanoiMetrics['movePattern']>({
+    tower1to2: 0,
+    tower1to3: 0,
+    tower2to1: 0,
+    tower2to3: 0,
+    tower3to1: 0,
+    tower3to2: 0,
+  });
+  const [firstHalfMetrics, setFirstHalfMetrics] = useState({
+    moves: 0,
+    invalidMoves: 0,
+    time: 0,
+  });
+
   // Save game state to session storage
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -107,97 +166,265 @@ export default function TowerOfHanoi({ onComplete }: TowerOfHanoiProps) {
 
   // Start the game
   const startGame = () => {
-    setGameState("playing")
-    setTowers([[3, 2, 1], [], []])
-    setSelectedTower(null)
-    setMoves(0)
-    setTimeLeft(60)
-    clearSessionStorage(); // Clear previous session data
-  }
+    setGameState("playing");
+    setTowers([[3, 2, 1], [], []]);
+    setSelectedTower(null);
+    setMoves(0);
+    setTimeLeft(60);
+    setScore(0);
+    
+    // Initialize metrics
+    const currentTime = Date.now();
+    setStartTime(currentTime);
+    setFirstMoveTime(0);
+    setMoveSequence([]);
+    setInvalidMoves(0);
+    setTowerStates([{
+      towers: [[3, 2, 1], [], []],
+      timeStamp: currentTime,
+    }]);
+    setMovePattern({
+      tower1to2: 0,
+      tower1to3: 0,
+      tower2to1: 0,
+      tower2to3: 0,
+      tower3to1: 0,
+      tower3to2: 0,
+    });
+    setFirstHalfMetrics({
+      moves: 0,
+      invalidMoves: 0,
+      time: 0,
+    });
+    clearSessionStorage();
+  };
 
   // Handle tower click
   const handleTowerClick = (towerIndex: number) => {
+    if (gameState !== "playing") return;
+
+    const currentTime = Date.now();
+    
+    // Track first move time
+    if (moves === 0 && firstMoveTime === 0 && selectedTower !== null) {
+      setFirstMoveTime(currentTime);
+    }
+
     if (selectedTower === null) {
       // If no tower is selected and the clicked tower has disks, select it
       if (towers[towerIndex].length > 0) {
-        setSelectedTower(towerIndex)
+        setSelectedTower(towerIndex);
       }
     } else {
       // If a tower is already selected
       if (selectedTower === towerIndex) {
         // Clicking the same tower deselects it
-        setSelectedTower(null)
+        setSelectedTower(null);
       } else {
         // Try to move disk from selected tower to clicked tower
-        const sourceDisks = [...towers[selectedTower]]
-        const targetDisks = [...towers[towerIndex]]
+        const sourceDisks = [...towers[selectedTower]];
+        const targetDisks = [...towers[towerIndex]];
 
         if (targetDisks.length === 0 || sourceDisks[sourceDisks.length - 1] < targetDisks[targetDisks.length - 1]) {
-          // Valid move: either target tower is empty or top disk of source is smaller than top disk of target
-          const diskToMove = sourceDisks.pop()!
-          targetDisks.push(diskToMove)
+          // Valid move
+          const diskToMove = sourceDisks.pop()!;
+          targetDisks.push(diskToMove);
 
-          const newTowers = [...towers]
-          newTowers[selectedTower] = sourceDisks
-          newTowers[towerIndex] = targetDisks
+          const newTowers = [...towers];
+          newTowers[selectedTower] = sourceDisks;
+          newTowers[towerIndex] = targetDisks;
 
-          setTowers(newTowers)
-          setMoves(moves + 1)
-          setSelectedTower(null)
+          // Track move pattern
+          const moveKey = `tower${selectedTower + 1}to${towerIndex + 1}` as keyof HanoiMetrics['movePattern'];
+          setMovePattern(prev => ({
+            ...prev,
+            [moveKey]: prev[moveKey] + 1
+          }));
 
-          // Check if the game is won (all disks moved to tower 3)
+          // Track move sequence
+          setMoveSequence(prev => [...prev, {
+            from: selectedTower,
+            to: towerIndex,
+            diskSize: diskToMove,
+            timeStamp: currentTime,
+          }]);
+
+          // Track tower states
+          setTowerStates(prev => [...prev, {
+            towers: newTowers,
+            timeStamp: currentTime,
+          }]);
+
+          setTowers(newTowers);
+          setMoves(moves + 1);
+          setSelectedTower(null);
+
+          // Update first half metrics if halfway
+          if (moves === Math.floor(optimalMoves / 2)) {
+            setFirstHalfMetrics({
+              moves: moves,
+              invalidMoves: invalidMoves,
+              time: currentTime - startTime,
+            });
+          }
+
+          // Check if the game is won
           if (newTowers[2].length === 3) {
-            // Calculate score based on moves and time left
-            const moveScore = Math.max(100 - (moves - optimalMoves) * 10, 10)
-            const timeBonus = Math.floor(timeLeft * 2)
-            const totalScore = moveScore + timeBonus
+            const endTime = currentTime;
+            const totalTime = endTime - startTime;
+            const planningTime = firstMoveTime - startTime;
 
-            setScore(totalScore)
-            setGameState("gameOver")
+            // Calculate metrics
+            const metrics: HanoiMetrics = {
+              completionTime: totalTime,
+              totalMoves: moves + 1,
+              optimalMoves,
+              moveEfficiency: optimalMoves / (moves + 1),
+              averageTimePerMove: (totalTime - planningTime) / (moves + 1),
+              invalidMoves,
+              movePattern,
+              performanceOverTime: {
+                firstHalf: {
+                  speed: firstHalfMetrics.moves > 0 ? 
+                    firstHalfMetrics.time / firstHalfMetrics.moves : 0,
+                  accuracy: firstHalfMetrics.moves > 0 ? 
+                    1 - (firstHalfMetrics.invalidMoves / firstHalfMetrics.moves) : 0,
+                },
+                secondHalf: {
+                  speed: (totalTime - firstHalfMetrics.time) / (moves - firstHalfMetrics.moves),
+                  accuracy: 1 - ((invalidMoves - firstHalfMetrics.invalidMoves) / 
+                    (moves - firstHalfMetrics.moves)),
+                },
+              },
+              moveSequence,
+              planningTime,
+              towerStates,
+            };
+
+            setGameState("gameOver");
+
+            // Calculate score based on metrics
+            const moveScore = Math.max(100 - (moves - optimalMoves) * 10, 10);
+            const timeBonus = Math.floor(timeLeft * 2);
+            const efficiencyBonus = Math.floor(metrics.moveEfficiency * 300);
+            const totalScore = moveScore + timeBonus + efficiencyBonus;
+            setScore(totalScore);
 
             // Update best moves if this is better
             if (bestMoves === 0 || moves < bestMoves) {
-              setBestMoves(moves)
+              setBestMoves(moves);
             }
+
+            clearSessionStorage();
+            setTimeout(() => onComplete(totalScore, metrics), 500);
           }
         } else {
-          // Invalid move, just deselect
-          setSelectedTower(null)
+          // Invalid move
+          setInvalidMoves(prev => prev + 1);
+          setSelectedTower(null);
         }
       }
     }
-  }
+  };
 
   // Timer effect
   useEffect(() => {
-    let timer: NodeJS.Timeout
+    let timer: NodeJS.Timeout;
 
     if (gameState === "playing") {
       timer = setInterval(() => {
         setTimeLeft((prevTime) => {
           if (prevTime <= 1) {
-            clearInterval(timer)
-            setGameState("gameOver")
+            clearInterval(timer);
+            setGameState("gameOver");
 
-            // Calculate a partial score based on progress
-            const progressScore = Math.floor(towers[2].length * 30 + towers[1].length * 10)
-            setScore(progressScore)
+            // Calculate metrics even when time runs out
+            const currentTime = Date.now();
+            const totalTime = currentTime - startTime;
+            const planningTime = firstMoveTime > 0 ? firstMoveTime - startTime : 0;
 
-            return 0
+            const metrics: HanoiMetrics = {
+              completionTime: totalTime,
+              totalMoves: moves,
+              optimalMoves,
+              moveEfficiency: optimalMoves / Math.max(moves, 1),
+              averageTimePerMove: moves > 0 ? (totalTime - planningTime) / moves : 0,
+              invalidMoves,
+              movePattern,
+              performanceOverTime: {
+                firstHalf: {
+                  speed: firstHalfMetrics.moves > 0 ? 
+                    firstHalfMetrics.time / firstHalfMetrics.moves : 0,
+                  accuracy: firstHalfMetrics.moves > 0 ? 
+                    1 - (firstHalfMetrics.invalidMoves / firstHalfMetrics.moves) : 0,
+                },
+                secondHalf: {
+                  speed: moves > firstHalfMetrics.moves ? 
+                    (totalTime - firstHalfMetrics.time) / (moves - firstHalfMetrics.moves) : 0,
+                  accuracy: moves > firstHalfMetrics.moves ? 
+                    1 - ((invalidMoves - firstHalfMetrics.invalidMoves) / 
+                    Math.max(moves - firstHalfMetrics.moves, 1)) : 0,
+                },
+              },
+              moveSequence,
+              planningTime,
+              towerStates,
+            };
+
+            // Calculate partial score based on progress
+            const progressScore = Math.floor(towers[2].length * 30 + towers[1].length * 10);
+            setScore(progressScore);
+
+            // Pass metrics even when time runs out
+            setTimeout(() => onComplete(progressScore, metrics), 500);
+
+            return 0;
           }
-          return prevTime - 1
-        })
-      }, 1000)
+          return prevTime - 1;
+        });
+      }, 1000);
     }
 
-    return () => clearInterval(timer)
-  }, [gameState, towers])
+    return () => clearInterval(timer);
+  }, [gameState, towers, startTime, firstMoveTime, moves, invalidMoves, movePattern, moveSequence, towerStates, firstHalfMetrics, optimalMoves]);
 
   // Move to next game
   const handleNextGame = () => {
+    const currentTime = Date.now();
+    const totalTime = currentTime - startTime;
+    const planningTime = firstMoveTime > 0 ? firstMoveTime - startTime : 0;
+
+    const metrics: HanoiMetrics = {
+      completionTime: totalTime,
+      totalMoves: moves,
+      optimalMoves,
+      moveEfficiency: optimalMoves / Math.max(moves, 1),
+      averageTimePerMove: moves > 0 ? (totalTime - planningTime) / moves : 0,
+      invalidMoves,
+      movePattern,
+      performanceOverTime: {
+        firstHalf: {
+          speed: firstHalfMetrics.moves > 0 ? 
+            firstHalfMetrics.time / firstHalfMetrics.moves : 0,
+          accuracy: firstHalfMetrics.moves > 0 ? 
+            1 - (firstHalfMetrics.invalidMoves / firstHalfMetrics.moves) : 0,
+        },
+        secondHalf: {
+          speed: moves > firstHalfMetrics.moves ? 
+            (totalTime - firstHalfMetrics.time) / (moves - firstHalfMetrics.moves) : 0,
+          accuracy: moves > firstHalfMetrics.moves ? 
+            1 - ((invalidMoves - firstHalfMetrics.invalidMoves) / 
+            Math.max(moves - firstHalfMetrics.moves, 1)) : 0,
+        },
+      },
+      moveSequence,
+      planningTime,
+      towerStates,
+    };
+
     clearSessionStorage();
-    onComplete(score)
-  }
+    onComplete(score, metrics);
+  };
 
   return (
     <Card className="w-full p-6 shadow-xl bg-white">
