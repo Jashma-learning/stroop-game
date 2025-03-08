@@ -37,7 +37,8 @@ const SESSION_KEYS = {
   TOTAL_SCORE: "cognitive_total_score",
   GAME_SCORES: "cognitive_game_scores",
   USER_DATA: "cognitive_user_data",
-  COGNITIVE_METRICS: "cognitive_metrics_data"
+  COGNITIVE_METRICS: "cognitive_metrics_data",
+  GAME_STATES: "cognitive_game_states"  // New key for tracking individual game states
 }
 
 export default function GameSeries() {
@@ -53,7 +54,17 @@ export default function GameSeries() {
   });
   const [userData, setUserData] = useState<UserData | null>(null);
   const [cognitiveMetrics, setCognitiveMetrics] = useState<CognitiveMetrics>({});
+  const [gameStates, setGameStates] = useState<Record<GameType, boolean>>({
+    stroop: false,
+    hanoi: false,
+    pattern: false,
+    maze: false,
+    memory: false,
+    word: false,
+    complete: false
+  });
 
+  // Load all saved state on initial render
   useEffect(() => {
     if (typeof window !== "undefined") {
       try {
@@ -62,27 +73,31 @@ export default function GameSeries() {
         const savedGameScores = sessionStorage.getItem(SESSION_KEYS.GAME_SCORES);
         const savedUserData = sessionStorage.getItem(SESSION_KEYS.USER_DATA);
         const savedMetrics = sessionStorage.getItem(SESSION_KEYS.COGNITIVE_METRICS);
+        const savedGameStates = sessionStorage.getItem(SESSION_KEYS.GAME_STATES);
 
         if (savedCurrentGame) setCurrentGame(savedCurrentGame as GameType);
         if (savedTotalScore) setTotalScore(parseInt(savedTotalScore));
         if (savedGameScores) setGameScores(JSON.parse(savedGameScores));
         if (savedUserData) setUserData(JSON.parse(savedUserData));
         if (savedMetrics) setCognitiveMetrics(JSON.parse(savedMetrics));
+        if (savedGameStates) setGameStates(JSON.parse(savedGameStates));
       } catch (error) {
         console.error("Error loading from session storage:", error);
       }
     }
   }, []);
 
+  // Save all state changes to session storage
   useEffect(() => {
     if (typeof window !== "undefined") {
       sessionStorage.setItem(SESSION_KEYS.CURRENT_GAME, currentGame);
       sessionStorage.setItem(SESSION_KEYS.TOTAL_SCORE, totalScore.toString());
       sessionStorage.setItem(SESSION_KEYS.GAME_SCORES, JSON.stringify(gameScores));
       sessionStorage.setItem(SESSION_KEYS.COGNITIVE_METRICS, JSON.stringify(cognitiveMetrics));
+      sessionStorage.setItem(SESSION_KEYS.GAME_STATES, JSON.stringify(gameStates));
       if (userData) sessionStorage.setItem(SESSION_KEYS.USER_DATA, JSON.stringify(userData));
     }
-  }, [currentGame, totalScore, gameScores, userData, cognitiveMetrics]);
+  }, [currentGame, totalScore, gameScores, userData, cognitiveMetrics, gameStates]);
 
   const handleUserSubmit = (data: UserData) => {
     setUserData(data);
@@ -90,13 +105,19 @@ export default function GameSeries() {
   };
 
   const handleGameComplete = (game: GameType, score: number, metrics?: any) => {
+    // Update game states to mark this game as completed
+    setGameStates(prev => ({
+      ...prev,
+      [game]: true
+    }));
+
+    // Update scores and metrics
     setGameScores((prev) => ({
       ...prev,
       [game]: score,
     }));
     setTotalScore((prev) => prev + score);
     
-    // Store cognitive metrics if provided
     if (metrics) {
       setCognitiveMetrics(prev => ({
         ...prev,
@@ -104,6 +125,7 @@ export default function GameSeries() {
       }));
     }
 
+    // Move to next game
     const gameOrder: GameType[] = ["stroop", "hanoi", "pattern", "maze", "memory", "word", "complete"];
     const currentIndex = gameOrder.indexOf(game);
     if (currentIndex < gameOrder.length - 1) {
@@ -112,6 +134,14 @@ export default function GameSeries() {
   };
 
   const restartSeries = () => {
+    // Clear all session storage
+    if (typeof window !== "undefined") {
+      Object.values(SESSION_KEYS).forEach(key => {
+        sessionStorage.removeItem(key);
+      });
+    }
+
+    // Reset all state
     setCurrentGame("stroop");
     setTotalScore(0);
     setGameScores({
@@ -124,15 +154,25 @@ export default function GameSeries() {
     });
     setUserData(null);
     setCognitiveMetrics({});
-    
-    if (typeof window !== "undefined") {
-      sessionStorage.removeItem(SESSION_KEYS.CURRENT_GAME);
-      sessionStorage.removeItem(SESSION_KEYS.TOTAL_SCORE);
-      sessionStorage.removeItem(SESSION_KEYS.GAME_SCORES);
-      sessionStorage.removeItem(SESSION_KEYS.USER_DATA);
-      sessionStorage.removeItem(SESSION_KEYS.COGNITIVE_METRICS);
-    }
+    setGameStates({
+      stroop: false,
+      hanoi: false,
+      pattern: false,
+      maze: false,
+      memory: false,
+      word: false,
+      complete: false
+    });
   };
+
+  // If no user data is present, show the user form
+  if (!userData) {
+    return (
+      <div className="w-full max-w-md mx-auto">
+        <UserForm onSubmit={handleUserSubmit} />
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-md mx-auto">
@@ -149,41 +189,11 @@ export default function GameSeries() {
             <p className="text-gray-600">You've completed all cognitive games!</p>
           </div>
 
-          <div className="bg-[#F3F4F6] p-6 rounded-lg mb-6">
-            <div className="mb-4 text-center">
-              <p className="text-lg font-semibold text-[#1E3A8A]">Total Score</p>
-              <p className="text-4xl font-bold text-[#6D28D9]">{totalScore}</p>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <p className="font-medium text-[#1E3A8A]">Stroop Challenge</p>
-                <p className="text-xl font-bold text-[#14B8A6]">{gameScores.stroop}</p>
-              </div>
-              <div className="flex justify-between items-center">
-                <p className="font-medium text-[#1E3A8A]">Tower of Hanoi</p>
-                <p className="text-xl font-bold text-[#14B8A6]">{gameScores.hanoi}</p>
-              </div>
-              <div className="flex justify-between items-center">
-                <p className="font-medium text-[#1E3A8A]">Pattern Puzzler</p>
-                <p className="text-xl font-bold text-[#14B8A6]">{gameScores.pattern}</p>
-              </div>
-              <div className="flex justify-between items-center">
-                <p className="font-medium text-[#1E3A8A]">Maze Navigator</p>
-                <p className="text-xl font-bold text-[#14B8A6]">{gameScores.maze}</p>
-              </div>
-              <div className="flex justify-between items-center">
-                <p className="font-medium text-[#1E3A8A]">Memory Match</p>
-                <p className="text-xl font-bold text-[#14B8A6]">{gameScores.memory}</p>
-              </div>
-              <div className="flex justify-between items-center">
-                <p className="font-medium text-[#1E3A8A]">Word Puzzle</p>
-                <p className="text-xl font-bold text-[#14B8A6]">{gameScores.word}</p>
-              </div>
-            </div>
-          </div>
-
-          <CognitiveReport scores={gameScores} userData={userData} metrics={cognitiveMetrics} />
+          <CognitiveReport 
+            scores={gameScores} 
+            userData={userData} 
+            metrics={cognitiveMetrics} 
+          />
 
           <Button
             onClick={restartSeries}

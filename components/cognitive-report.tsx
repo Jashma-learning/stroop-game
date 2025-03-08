@@ -1,4 +1,5 @@
 import { Card } from "@/components/ui/card"
+import { Brain, Trophy, Target, TrendingUp, Zap, BarChart2, Activity } from "lucide-react"
 
 interface CognitiveReportProps {
   scores: {
@@ -47,333 +48,202 @@ export default function CognitiveReport({ scores, userData, metrics }: Cognitive
   }
 
   return (
-    <Card className="w-full p-6 bg-white border-t-4 border-[#1E3A8A]">
-      <h2 className="text-2xl font-bold text-[#1E3A8A] mb-4">Cognitive Assessment Report</h2>
-
+    <div className="min-h-screen bg-[#0B1437] py-8">
+      <div className="container mx-auto px-4 md:px-6 xl:px-0 max-w-screen-xl">
+        {/* Header Section */}
+        <div className="bg-[#1E3A8A]/30 p-6 rounded-lg border border-white/10 mb-8">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+            <div className="flex-1">
+              <h2 className="text-2xl md:text-3xl xl:text-4xl font-bold text-white">Cognitive Assessment Report</h2>
       {userData && (
-        <div className="mb-4">
-          <p>
-            <strong>Name:</strong> {userData.name}
+                <div className="mt-3">
+                  <p className="text-base md:text-lg text-[#F3F4F6]/80">
+                    {userData.name} · Age: {userData.age} · {userData.education}
+                  </p>
+                </div>
+              )}
+            </div>
+            <div className="flex lg:flex-col items-start lg:items-end gap-6 lg:gap-2">
+              <div className="text-right">
+                <p className="text-sm md:text-base text-[#F3F4F6]/80">Overall Score</p>
+                <p className="text-2xl md:text-3xl xl:text-4xl font-bold text-[#14B8A6]">{totalScore}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm md:text-base text-[#F3F4F6]/80">Cognitive Level</p>
+                <p className="text-lg md:text-xl font-semibold text-white">{getCognitiveLevel(totalScore)}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Performance Overview Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
+          <MetricCard
+            title="Attention & Processing"
+            score={scores.stroop}
+            strength={getAreaStrength(scores.stroop)}
+            icon={Zap}
+            metrics={[
+              { label: "Accuracy", value: metrics?.stroop ? `${(100 - metrics.stroop.errorRate * 100).toFixed(1)}%` : "N/A" },
+              { label: "Avg Response", value: metrics?.stroop ? `${Math.round(metrics.stroop.avgReactionTime)}ms` : "N/A" },
+              { label: "Best Streak", value: metrics?.stroop?.bestStreak || "N/A" }
+            ]}
+          />
+          <MetricCard
+            title="Problem Solving"
+            score={scores.hanoi}
+            strength={getAreaStrength(scores.hanoi)}
+            icon={Brain}
+            metrics={[
+              { label: "Efficiency", value: metrics?.hanoi ? `${(metrics.hanoi.moveEfficiency * 100).toFixed(1)}%` : "N/A" },
+              { label: "Planning Time", value: metrics?.hanoi ? `${(metrics.hanoi.planningTime / 1000).toFixed(1)}s` : "N/A" },
+              { label: "Invalid Moves", value: metrics?.hanoi?.invalidMoves || "N/A" }
+            ]}
+          />
+          <MetricCard
+            title="Pattern Recognition"
+            score={scores.pattern}
+            strength={getAreaStrength(scores.pattern)}
+            icon={Target}
+            metrics={[
+              { label: "Patterns Found", value: scores.pattern ? Math.round(scores.pattern / 100) : "N/A" },
+              { label: "Accuracy", value: "N/A" },
+              { label: "Best Level", value: "N/A" }
+            ]}
+          />
+          <MetricCard
+            title="Spatial Reasoning"
+            score={scores.maze}
+            strength={getAreaStrength(scores.maze)}
+            icon={Activity}
+            metrics={[
+              { label: "Path Efficiency", value: metrics?.maze ? `${(metrics.maze.pathEfficiency * 100).toFixed(1)}%` : "N/A" },
+              { label: "Wall Collisions", value: metrics?.maze?.wallCollisions || "N/A" },
+              { label: "Completion Time", value: metrics?.maze ? `${(metrics.maze.completionTime / 1000).toFixed(1)}s` : "N/A" }
+            ]}
+          />
+          <MetricCard
+            title="Visual Memory"
+            score={scores.memory}
+            strength={getAreaStrength(scores.memory)}
+            icon={BarChart2}
+            metrics={[
+              { label: "Match Accuracy", value: metrics?.memory ? `${(metrics.memory.matchAccuracy * 100).toFixed(1)}%` : "N/A" },
+              { label: "Avg Time/Move", value: metrics?.memory ? `${Math.round(metrics.memory.averageTimePerMove)}ms` : "N/A" },
+              { label: "Memory Effect", value: metrics?.memory ? `${(metrics.memory.memorizeEffectiveness * 100).toFixed(1)}%` : "N/A" }
+            ]}
+          />
+          <MetricCard
+            title="Verbal Skills"
+            score={scores.word}
+            strength={getAreaStrength(scores.word)}
+            icon={TrendingUp}
+            metrics={[
+              { label: "Words Completed", value: metrics?.word?.wordsCompleted || "N/A" },
+              { label: "Accuracy", value: metrics?.word ? `${(metrics.word.accuracy * 100).toFixed(1)}%` : "N/A" },
+              { label: "Best Streak", value: metrics?.word?.longestStreak || "N/A" }
+            ]}
+          />
+        </div>
+
+        {/* Learning Progress Section */}
+        <div className="bg-[#1E3A8A]/30 rounded-lg border border-white/10 p-6 md:p-8">
+          <h3 className="text-2xl md:text-3xl font-bold text-white mb-6">Learning Progress</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {metrics?.stroop && (
+              <ProgressCard
+                title="Attention Improvement"
+                firstHalf={metrics.stroop.performanceOverTime.firstHalf}
+                secondHalf={metrics.stroop.performanceOverTime.secondHalf}
+              />
+            )}
+            {metrics?.memory && (
+              <ProgressCard
+                title="Memory Development"
+                firstHalf={metrics.memory.performanceOverTime.firstHalf}
+                secondHalf={metrics.memory.performanceOverTime.secondHalf}
+              />
+            )}
+            {metrics?.maze && (
+              <ProgressCard
+                title="Spatial Learning"
+                firstHalf={metrics.maze.performanceOverTime.firstHalf}
+                secondHalf={metrics.maze.performanceOverTime.secondHalf}
+              />
+            )}
+          </div>
+        </div>
+
+        <div className="text-sm md:text-base text-[#F3F4F6]/60 mt-8 max-w-3xl mx-auto">
+          <p className="text-center">
+            This report provides a general assessment of cognitive abilities based on game performance.
+            For a comprehensive evaluation, please consult with a qualified professional.
           </p>
-          <p>
-            <strong>Age:</strong> {userData.age}
-          </p>
-          <p>
-            <strong>Education:</strong> {userData.education}
-          </p>
         </div>
-      )}
-
-      <div className="mb-4">
-        <h3 className="text-xl font-semibold text-[#6D28D9]">Overall Cognitive Level</h3>
-        <p className="text-lg font-bold">{getCognitiveLevel(totalScore)}</p>
-        <p>
-          Total Score: {totalScore} / {maxPossibleScore}
-        </p>
       </div>
+    </div>
+  )
+}
 
-      <div className="space-y-2 mb-6">
-        <h3 className="text-xl font-semibold text-[#6D28D9]">Cognitive Areas</h3>
-        <p>
-          <strong>Attention and Processing Speed (Stroop):</strong> {getAreaStrength(scores.stroop)}
-        </p>
-        <p>
-          <strong>Problem Solving (Tower of Hanoi):</strong> {getAreaStrength(scores.hanoi)}
-        </p>
-        <p>
-          <strong>Visual Memory (Pattern Puzzler):</strong> {getAreaStrength(scores.pattern)}
-        </p>
-        <p>
-          <strong>Spatial Reasoning (Maze Navigator):</strong> {getAreaStrength(scores.maze)}
-        </p>
-        <p>
-          <strong>Visual Recognition and Memory (Memory Match):</strong> {getAreaStrength(scores.memory)}
-        </p>
-        <p>
-          <strong>Verbal Skills (Word Puzzle):</strong> {getAreaStrength(scores.word)}
-        </p>
+function MetricCard({ title, score, strength, icon: Icon, metrics }: { 
+  title: string;
+  score: number;
+  strength: string;
+  icon: any;
+  metrics: Array<{ label: string; value: string | number }>;
+}) {
+  return (
+    <div className="bg-[#1E3A8A]/30 rounded-lg border border-white/10 p-6 h-full">
+      <div className="flex justify-between items-start mb-6">
+        <div>
+          <h3 className="text-lg md:text-xl font-semibold text-white mb-1">{title}</h3>
+          <p className="text-sm md:text-base text-[#14B8A6]">{strength}</p>
+        </div>
+        <Icon className="w-6 h-6 md:w-8 md:h-8 text-[#14B8A6]" />
       </div>
-
-      {metrics?.stroop && (
-        <div className="mb-4 p-4 bg-[#F3F4F6] rounded-lg">
-          <h3 className="text-lg font-semibold text-[#6D28D9] mb-2">Stroop Task Metrics</h3>
-          
-          <div className="grid grid-cols-2 gap-4 mt-2">
-            <div>
-              <p className="font-medium">Total Trials:</p>
-              <p>{metrics.stroop.totalTrials}</p>
-            </div>
-            <div>
-              <p className="font-medium">Correct Responses:</p>
-              <p>{metrics.stroop.correctResponses}</p>
-            </div>
-            <div>
-              <p className="font-medium">Incorrect Responses:</p>
-              <p>{metrics.stroop.incorrectResponses}</p>
-            </div>
-            <div>
-              <p className="font-medium">Best Streak:</p>
-              <p>{metrics.stroop.bestStreak}</p>
-            </div>
-            <div>
-              <p className="font-medium">Avg Reaction Time:</p>
-              <p>{Math.round(metrics.stroop.avgReactionTime)} ms</p>
-            </div>
-            <div>
-              <p className="font-medium">Error Rate:</p>
-              <p>{(metrics.stroop.errorRate * 100).toFixed(1)}%</p>
-            </div>
-            <div>
-              <p className="font-medium">Congruent Trials:</p>
-              <p>{metrics.stroop.congruentTrials.count}</p>
-            </div>
-            <div>
-              <p className="font-medium">Incongruent Trials:</p>
-              <p>{metrics.stroop.incongruentTrials.count}</p>
-            </div>
-            <div>
-              <p className="font-medium">Interference Effect:</p>
-              <p>{Math.round(metrics.stroop.interferenceEffect)} ms</p>
-            </div>
+      <p className="text-3xl md:text-4xl font-bold text-white mb-6">{score}</p>
+      <div className="space-y-4">
+        {metrics.map((metric, index) => (
+          <div key={index} className="flex justify-between items-center">
+            <span className="text-base text-[#F3F4F6]/70">{metric.label}</span>
+            <span className="text-base font-medium text-white">{metric.value}</span>
           </div>
-        </div>
-      )}
-
-      {metrics?.hanoi && (
-        <div className="mb-4 p-4 bg-[#F3F4F6] rounded-lg">
-          <h3 className="text-lg font-semibold text-[#6D28D9] mb-2">Tower of Hanoi Metrics</h3>
-          
-          <div className="grid grid-cols-2 gap-4 mt-2">
-            <div>
-              <p className="font-medium">Total Moves:</p>
-              <p>{metrics.hanoi.totalMoves}</p>
-            </div>
-            <div>
-              <p className="font-medium">Optimal Moves:</p>
-              <p>{metrics.hanoi.optimalMoves}</p>
-            </div>
-            <div>
-              <p className="font-medium">Move Efficiency:</p>
-              <p>{(metrics.hanoi.moveEfficiency * 100).toFixed(1)}%</p>
-            </div>
-            <div>
-              <p className="font-medium">Invalid Moves:</p>
-              <p>{metrics.hanoi.invalidMoves}</p>
-            </div>
-            <div>
-              <p className="font-medium">Planning Time:</p>
-              <p>{(metrics.hanoi.planningTime / 1000).toFixed(2)}s</p>
-            </div>
-            <div>
-              <p className="font-medium">Avg Time per Move:</p>
-              <p>{Math.round(metrics.hanoi.averageTimePerMove)}ms</p>
-            </div>
-            <div>
-              <p className="font-medium">Move Pattern:</p>
-              <p className="text-sm">
-                1→2: {metrics.hanoi.movePattern.tower1to2}<br />
-                1→3: {metrics.hanoi.movePattern.tower1to3}<br />
-                2→1: {metrics.hanoi.movePattern.tower2to1}<br />
-                2→3: {metrics.hanoi.movePattern.tower2to3}<br />
-                3→1: {metrics.hanoi.movePattern.tower3to1}<br />
-                3→2: {metrics.hanoi.movePattern.tower3to2}
-              </p>
-            </div>
-            <div>
-              <p className="font-medium">Learning Progress:</p>
-              <p>
-                {(
-                  (metrics.hanoi.performanceOverTime.secondHalf.accuracy - 
-                  metrics.hanoi.performanceOverTime.firstHalf.accuracy) * 100
-                ).toFixed(1)}%
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {metrics?.maze && (
-        <div className="mb-4 p-4 bg-[#F3F4F6] rounded-lg">
-          <h3 className="text-lg font-semibold text-[#6D28D9] mb-2">Maze Navigation Metrics</h3>
-          
-          <div className="grid grid-cols-2 gap-4 mt-2">
-            <div>
-              <p className="font-medium">Completion Time:</p>
-              <p>{metrics.maze.completionTime ? (metrics.maze.completionTime / 1000).toFixed(2) : 'N/A'}s</p>
-            </div>
-            <div>
-              <p className="font-medium">Total Moves:</p>
-              <p>{metrics.maze.totalMoves || 'N/A'}</p>
-            </div>
-            <div>
-              <p className="font-medium">Wall Collisions:</p>
-              <p>{metrics.maze.wallCollisions || 'N/A'}</p>
-            </div>
-            <div>
-              <p className="font-medium">Backtracks:</p>
-              <p>{metrics.maze.backtrackCount || 'N/A'}</p>
-            </div>
-            <div>
-              <p className="font-medium">Optimal Path Length:</p>
-              <p>{metrics.maze.optimalPath?.length || 'N/A'} steps</p>
-            </div>
-            <div>
-              <p className="font-medium">Actual Path Length:</p>
-              <p>{metrics.maze.actualPath?.length || 'N/A'} steps</p>
-            </div>
-            <div>
-              <p className="font-medium">Path Deviation:</p>
-              <p>{metrics.maze.pathDeviation || 'N/A'} steps</p>
-            </div>
-            <div>
-              <p className="font-medium">Path Efficiency:</p>
-              <p>{metrics.maze.pathEfficiency ? (metrics.maze.pathEfficiency * 100).toFixed(1) : 'N/A'}%</p>
-            </div>
-            <div>
-              <p className="font-medium">Avg Time per Move:</p>
-              <p>{metrics.maze.averageTimePerMove ? Math.round(metrics.maze.averageTimePerMove) : 'N/A'}ms</p>
-            </div>
-            <div>
-              <p className="font-medium">Movement Pattern:</p>
-              <p>
-                {metrics.maze.movementPatterns ? (
-                  <>
-                    ↑{metrics.maze.movementPatterns.up} 
-                    ↓{metrics.maze.movementPatterns.down} 
-                    ←{metrics.maze.movementPatterns.left} 
-                    →{metrics.maze.movementPatterns.right}
-                  </>
-                ) : 'N/A'}
-              </p>
-            </div>
-            <div>
-              <p className="font-medium">Learning Progress:</p>
-              <p>{metrics.maze.performanceOverTime ? (
-                (metrics.maze.performanceOverTime.secondHalf.accuracy - 
-                metrics.maze.performanceOverTime.firstHalf.accuracy) * 100
-              ).toFixed(1) : 'N/A'}%</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {metrics?.memory && (
-        <div className="mb-4 p-4 bg-[#F3F4F6] rounded-lg">
-          <h3 className="text-lg font-semibold text-[#6D28D9] mb-2">Memory Game Metrics</h3>
-          
-          <div className="grid grid-cols-2 gap-4 mt-2">
-            <div>
-              <p className="font-medium">Total Time:</p>
-              <p>{(metrics.memory.totalTime / 1000).toFixed(2)}s</p>
-            </div>
-            <div>
-              <p className="font-medium">Memorization Time:</p>
-              <p>{(metrics.memory.memorizeTime / 1000).toFixed(2)}s</p>
-            </div>
-            <div>
-              <p className="font-medium">Total Moves:</p>
-              <p>{metrics.memory.totalMoves}</p>
-            </div>
-            <div>
-              <p className="font-medium">Correct Matches:</p>
-              <p>{metrics.memory.correctMatches}</p>
-            </div>
-            <div>
-              <p className="font-medium">Incorrect Attempts:</p>
-              <p>{metrics.memory.incorrectAttempts}</p>
-            </div>
-            <div>
-              <p className="font-medium">Match Accuracy:</p>
-              <p>{(metrics.memory.matchAccuracy * 100).toFixed(1)}%</p>
-            </div>
-            <div>
-              <p className="font-medium">Avg Time per Move:</p>
-              <p>{Math.round(metrics.memory.averageTimePerMove)}ms</p>
-            </div>
-            <div>
-              <p className="font-medium">Memory Effectiveness:</p>
-              <p>{(metrics.memory.memorizeEffectiveness * 100).toFixed(1)}%</p>
-            </div>
-            <div>
-              <p className="font-medium">First Half Performance:</p>
-              <p>
-                Accuracy: {(metrics.memory.performanceOverTime.firstHalf.accuracy * 100).toFixed(1)}%<br />
-                Speed: {Math.round(metrics.memory.performanceOverTime.firstHalf.speed)}ms
-              </p>
-            </div>
-            <div>
-              <p className="font-medium">Second Half Performance:</p>
-              <p>
-                Accuracy: {(metrics.memory.performanceOverTime.secondHalf.accuracy * 100).toFixed(1)}%<br />
-                Speed: {Math.round(metrics.memory.performanceOverTime.secondHalf.speed)}ms
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {metrics?.word && (
-        <div className="mb-4 p-4 bg-[#F3F4F6] rounded-lg">
-          <h3 className="text-lg font-semibold text-[#6D28D9] mb-2">Word Puzzle Metrics</h3>
-          
-          <div className="grid grid-cols-2 gap-4 mt-2">
-            <div>
-              <p className="font-medium">Total Time:</p>
-              <p>{(metrics.word.totalTime / 1000).toFixed(2)}s</p>
-            </div>
-            <div>
-              <p className="font-medium">Words Attempted:</p>
-              <p>{metrics.word.wordsAttempted}</p>
-            </div>
-            <div>
-              <p className="font-medium">Words Completed:</p>
-              <p>{metrics.word.wordsCompleted}</p>
-            </div>
-            <div>
-              <p className="font-medium">Incorrect Attempts:</p>
-              <p>{metrics.word.incorrectAttempts}</p>
-            </div>
-            <div>
-              <p className="font-medium">Accuracy:</p>
-              <p>{(metrics.word.accuracy * 100).toFixed(1)}%</p>
-            </div>
-            <div>
-              <p className="font-medium">Avg Time per Word:</p>
-              <p>{Math.round(metrics.word.averageTimePerWord)}ms</p>
-            </div>
-            <div>
-              <p className="font-medium">Longest Streak:</p>
-              <p>{metrics.word.longestStreak}</p>
-            </div>
-            <div>
-              <p className="font-medium">Final Streak:</p>
-              <p>{metrics.word.currentStreak}</p>
-            </div>
-            <div>
-              <p className="font-medium">First Half Performance:</p>
-              <p>
-                Accuracy: {(metrics.word.performanceOverTime.firstHalf.accuracy * 100).toFixed(1)}%<br />
-                Speed: {Math.round(metrics.word.performanceOverTime.firstHalf.speed)}ms
-              </p>
-            </div>
-            <div>
-              <p className="font-medium">Second Half Performance:</p>
-              <p>
-                Accuracy: {(metrics.word.performanceOverTime.secondHalf.accuracy * 100).toFixed(1)}%<br />
-                Speed: {Math.round(metrics.word.performanceOverTime.secondHalf.speed)}ms
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="mt-4 text-sm text-gray-600">
-        <p>
-          This report provides a general assessment of cognitive abilities based on game performance. For a
-          comprehensive evaluation, please consult with a qualified professional.
-        </p>
+        ))}
       </div>
-    </Card>
+    </div>
+  )
+}
+
+function ProgressCard({
+  title,
+  firstHalf,
+  secondHalf
+}: {
+  title: string;
+  firstHalf: { accuracy: number; speed: number };
+  secondHalf: { accuracy: number; speed: number };
+}) {
+  const accuracyImprovement = ((secondHalf.accuracy - firstHalf.accuracy) * 100).toFixed(1)
+  const speedImprovement = ((firstHalf.speed - secondHalf.speed) / firstHalf.speed * 100).toFixed(1)
+
+  return (
+    <div className="bg-[#1E3A8A]/40 rounded-lg border border-white/10 p-6 h-full">
+      <h4 className="text-lg md:text-xl font-semibold text-white mb-6">{title}</h4>
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <span className="text-base text-[#F3F4F6]/70">Accuracy Change</span>
+          <span className={`text-base font-medium ${Number(accuracyImprovement) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            {accuracyImprovement}%
+          </span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="text-base text-[#F3F4F6]/70">Speed Improvement</span>
+          <span className={`text-base font-medium ${Number(speedImprovement) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            {speedImprovement}%
+          </span>
+        </div>
+      </div>
+    </div>
   )
 }
 

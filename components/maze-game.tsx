@@ -468,7 +468,7 @@ export default function MazeGame({ onComplete }: MazeGameProps) {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-[#F3F4F6] py-4">
       <h2 className="text-3xl font-bold text-[#1E3A8A] mb-2">Maze Navigator</h2>
-      
+
       {gameState === "ready" && (
         <div className="text-center space-y-6">
           <div className="bg-[#F3F4F6] p-4 rounded-lg">

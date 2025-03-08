@@ -9,7 +9,7 @@ import { Timer, Trophy, ArrowRight } from "lucide-react";
 // Define the color palette with proper typing
 const COLORS = {
   red: "#E53E3E",
-  blue: "#1E3A8A", 
+  blue: "#1E3A8A",
   green: "#10B981",
   yellow: "#F59E0B",
   orange: "#FB923C",
@@ -18,7 +18,7 @@ const COLORS = {
 // Color names for the game
 const COLOR_NAMES = Object.keys(COLORS) as Array<keyof typeof COLORS>;
 
-type GameState = "ready" | "playing" | "gameOver";
+type GameState = "instructions" | "ready" | "playing" | "complete";
 
 interface StroopGameProps {
   onComplete: (score: number, metrics: StroopMetrics) => void;
@@ -70,8 +70,8 @@ interface TrialData {
   timestamp: number;
 }
 
-// Session storage keys for this game
-const STROOP_SESSION_KEYS = {
+// Session storage keys
+const SESSION_KEYS = {
   GAME_STATE: "stroop_game_state",
   SCORE: "stroop_score",
   TIME_LEFT: "stroop_time_left",
@@ -79,11 +79,11 @@ const STROOP_SESSION_KEYS = {
   CURRENT_COLOR: "stroop_current_color",
   STREAK: "stroop_streak",
   BEST_STREAK: "stroop_best_streak",
-  TRIAL_DATA: "stroop_trial_data",
+  TRIAL_DATA: "stroop_trial_data"
 };
 
 export default function StroopGame({ onComplete }: StroopGameProps) {
-  const [gameState, setGameState] = useState<GameState>("ready");
+  const [gameState, setGameState] = useState<GameState>("instructions");
   const [score, setScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState(30);
   const [currentWord, setCurrentWord] = useState<keyof typeof COLORS>("red");
@@ -96,12 +96,69 @@ export default function StroopGame({ onComplete }: StroopGameProps) {
   const [trialData, setTrialData] = useState<TrialData[]>([]);
   const [totalTrials, setTotalTrials] = useState(0);
 
+  // Load saved state on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const savedGameState = sessionStorage.getItem(SESSION_KEYS.GAME_STATE);
+        const savedScore = sessionStorage.getItem(SESSION_KEYS.SCORE);
+        const savedTimeLeft = sessionStorage.getItem(SESSION_KEYS.TIME_LEFT);
+        const savedCurrentWord = sessionStorage.getItem(SESSION_KEYS.CURRENT_WORD);
+        const savedCurrentColor = sessionStorage.getItem(SESSION_KEYS.CURRENT_COLOR);
+        const savedStreak = sessionStorage.getItem(SESSION_KEYS.STREAK);
+        const savedBestStreak = sessionStorage.getItem(SESSION_KEYS.BEST_STREAK);
+        const savedTrialData = sessionStorage.getItem(SESSION_KEYS.TRIAL_DATA);
+
+        if (savedGameState) setGameState(savedGameState as GameState);
+        if (savedScore) setScore(parseInt(savedScore));
+        if (savedTimeLeft) setTimeLeft(parseInt(savedTimeLeft));
+        if (savedCurrentWord) setCurrentWord(savedCurrentWord as keyof typeof COLORS);
+        if (savedCurrentColor) setCurrentColor(savedCurrentColor as keyof typeof COLORS);
+        if (savedStreak) setStreak(parseInt(savedStreak));
+        if (savedBestStreak) setBestStreak(parseInt(savedBestStreak));
+        if (savedTrialData) setTrialData(JSON.parse(savedTrialData));
+      } catch (error) {
+        console.error("Error loading Stroop game state:", error);
+      }
+    }
+  }, []);
+
+  // Save state changes to session storage
+  useEffect(() => {
+    if (typeof window !== "undefined" && gameState !== "complete") {
+      sessionStorage.setItem(SESSION_KEYS.GAME_STATE, gameState);
+      sessionStorage.setItem(SESSION_KEYS.SCORE, score.toString());
+      sessionStorage.setItem(SESSION_KEYS.TIME_LEFT, timeLeft.toString());
+      sessionStorage.setItem(SESSION_KEYS.CURRENT_WORD, currentWord.toString());
+      sessionStorage.setItem(SESSION_KEYS.CURRENT_COLOR, currentColor.toString());
+      sessionStorage.setItem(SESSION_KEYS.STREAK, streak.toString());
+      sessionStorage.setItem(SESSION_KEYS.BEST_STREAK, bestStreak.toString());
+      sessionStorage.setItem(SESSION_KEYS.TRIAL_DATA, JSON.stringify(trialData));
+    }
+  }, [gameState, score, timeLeft, currentWord, currentColor, streak, bestStreak, trialData]);
+
+  // Clear session storage only when game is complete
+  useEffect(() => {
+    if (gameState === "complete" && typeof window !== "undefined") {
+      // Calculate final metrics before clearing
+      const metrics = calculateMetrics();
+      
+      // Call onComplete with final score and metrics
+      onComplete(score, metrics);
+
+      // Clear session storage
+      Object.values(SESSION_KEYS).forEach(key => {
+        sessionStorage.removeItem(key);
+      });
+    }
+  }, [gameState, score, trialData]);
+
   const generateChallenge = useCallback(() => {
     const randomWordIndex = Math.floor(Math.random() * COLOR_NAMES.length);
     const randomColorIndex = Math.floor(Math.random() * COLOR_NAMES.length);
     const shouldBeDifferent = Math.random() < 0.7;
     const finalColorIndex = shouldBeDifferent && randomWordIndex === randomColorIndex
-      ? (randomColorIndex + 1) % COLOR_NAMES.length
+        ? (randomColorIndex + 1) % COLOR_NAMES.length
       : randomColorIndex;
 
     const wordToShow = COLOR_NAMES[randomWordIndex];
@@ -127,7 +184,7 @@ export default function StroopGame({ onComplete }: StroopGameProps) {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          setGameState("gameOver");
+          setGameState("complete");
           return 0;
         }
         return prev - 1;
@@ -136,13 +193,6 @@ export default function StroopGame({ onComplete }: StroopGameProps) {
 
     return () => clearInterval(timer);
   };
-
-  // Save trial data to session storage
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      sessionStorage.setItem(STROOP_SESSION_KEYS.TRIAL_DATA, JSON.stringify(trialData));
-    }
-  }, [trialData]);
 
   const handleColorSelect = (selectedColor: keyof typeof COLORS) => {
     if (!startTime) return;
@@ -268,7 +318,7 @@ export default function StroopGame({ onComplete }: StroopGameProps) {
 
   const handleNextGame = () => {
     if (typeof window !== "undefined") {
-      Object.values(STROOP_SESSION_KEYS).forEach((key) => {
+      Object.values(SESSION_KEYS).forEach((key) => {
         sessionStorage.removeItem(key);
       });
     }
@@ -285,7 +335,7 @@ export default function StroopGame({ onComplete }: StroopGameProps) {
         <p className="text-gray-600">Select the <strong>color</strong> of the text, not what it says!</p>
       </div>
 
-      {gameState === "ready" && (
+      {gameState === "instructions" && (
         <div className="text-center space-y-6">
           <div className="bg-[#F3F4F6] p-4 rounded-lg">
             <p className="mb-4">
@@ -326,10 +376,10 @@ export default function StroopGame({ onComplete }: StroopGameProps) {
 
           <div className="grid grid-cols-3 gap-3">
             {COLOR_NAMES.map((color) => (
-              <Button 
-                key={color} 
-                onClick={() => handleColorSelect(color)} 
-                className="py-6" 
+              <Button
+                key={color}
+                onClick={() => handleColorSelect(color)}
+                className="py-6"
                 style={{ backgroundColor: COLORS[color] }}
               >
                 <span className="sr-only">{color}</span>
@@ -339,7 +389,7 @@ export default function StroopGame({ onComplete }: StroopGameProps) {
         </>
       )}
 
-      {gameState === "gameOver" && (
+      {gameState === "complete" && (
         <div className="text-center space-y-6">
           <h2 className="text-2xl font-bold text-[#1E3A8A]">Game Complete!</h2>
 
@@ -355,7 +405,7 @@ export default function StroopGame({ onComplete }: StroopGameProps) {
                 <p className="text-xl font-bold text-[#10B981]">{totalTrials}</p>
               </div>
               <div>
-                <p className="font-medium">Best Streak</p>
+              <p className="font-medium">Best Streak</p>
                 <p className="text-xl font-bold text-[#10B981]">{bestStreak}</p>
               </div>
             </div>

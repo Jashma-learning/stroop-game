@@ -41,6 +41,9 @@ module.exports = {
           foreground: "hsl(var(--card-foreground))",
         },
       },
+      backgroundImage: {
+        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
+      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
@@ -48,17 +51,50 @@ module.exports = {
       },
       keyframes: {
         "accordion-down": {
-          from: { height: 0 },
+          from: { height: "0" },
           to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
           from: { height: "var(--radix-accordion-content-height)" },
-          to: { height: 0 },
+          to: { height: "0" },
         },
+        "wave-slow": {
+          "0%, 100%": { 
+            transform: "translateY(0%) rotate(0deg)",
+            opacity: 0.3
+          },
+          "50%": { 
+            transform: "translateY(-2%) rotate(1deg)",
+            opacity: 0.5
+          }
+        },
+        "wave-slower": {
+          "0%, 100%": { 
+            transform: "translateY(0%) rotate(0deg)",
+            opacity: 0.3
+          },
+          "50%": { 
+            transform: "translateY(2%) rotate(-1deg)",
+            opacity: 0.5
+          }
+        },
+        "wave-slowest": {
+          "0%, 100%": { 
+            transform: "translateY(-1%) rotate(0deg)",
+            opacity: 0.3
+          },
+          "50%": { 
+            transform: "translateY(1%) rotate(1deg)",
+            opacity: 0.5
+          }
+        }
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "wave-slow": "wave-slow 7s ease-in-out infinite",
+        "wave-slower": "wave-slower 10s ease-in-out infinite",
+        "wave-slowest": "wave-slowest 13s ease-in-out infinite"
       },
     },
   },

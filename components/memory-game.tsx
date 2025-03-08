@@ -294,7 +294,7 @@ export default function MemoryGame({ onComplete }: MemoryGameProps) {
         }));
       }
       
-      setTimeout(() => {
+        setTimeout(() => {
         let updatedCards;
         if (isMatch) {
           updatedCards = newCards.map(card => 
@@ -348,7 +348,7 @@ export default function MemoryGame({ onComplete }: MemoryGameProps) {
             
             setTimeout(() => onComplete(finalScore, metrics), 500);
           }
-        } else {
+      } else {
           updatedCards = newCards.map(card => 
             card.isFlipped && !card.isMatched
               ? { ...card, isFlipped: false }
@@ -445,21 +445,21 @@ export default function MemoryGame({ onComplete }: MemoryGameProps) {
           </div>
 
           <div className="grid grid-cols-3 gap-3 md:gap-4">
-            {cards.map((card, index) => (
+        {cards.map((card, index) => (
               <div key={card.id} className="aspect-square h-24 md:h-28" onClick={() => handleCardClick(index)}>
                 <div className={`memory-card ${card.isFlipped || card.isMatched ? 'flipped' : ''}`}>
                   <div className="card-face front bg-[#F3F4F6] border border-[#E5E7EB] hover:border-[#1E3A8A] hover:bg-[#EDF2F7] rounded-md">
                     <div className="text-[#CBD5E1] text-2xl">?</div>
                   </div>
                   <div className={`card-face back ${card.isMatched ? 'bg-indigo-900/50 border-indigo-400/50' : 'bg-indigo-800/50 border-indigo-500/50'} rounded-md`}>
-                    <card.icon 
+                    <card.icon
                       className={`w-10 h-10 ${card.color} ${card.isMatched ? 'drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]' : ''}`}
                     />
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
+        ))}
+      </div>
         </div>
       )}
 
@@ -477,16 +477,16 @@ export default function MemoryGame({ onComplete }: MemoryGameProps) {
               <p className="font-medium">Matches Found</p>
               <p className="text-xl font-bold text-[#10B981]">{matches}/{CARD_CONFIGS.length}</p>
             </div>
-          </div>
+      </div>
 
-          <Button
+      <Button 
             onClick={handleComplete}
             className="w-full py-6 text-lg bg-[#1E3A8A] hover:bg-[#1E40AF] flex items-center justify-center"
           >
             Next Game: Word Puzzle
             <ArrowRight className="w-5 h-5 ml-2" />
-          </Button>
-        </div>
+      </Button>
+    </div>
       )}
     </Card>
   )
