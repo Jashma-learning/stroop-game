@@ -73,7 +73,7 @@ export default function LandingPage() {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-2">
               <Brain className="w-6 h-6 text-[#14B8A6]" />
-              <span className="text-gray-800 font-bold">CognitivePro</span>
+              <span className="text-gray-800 font-bold">IQ Level</span>
             </div>
             <div className="flex items-center space-x-6">
               <a href="#features" className="text-gray-600 hover:text-gray-900 transition-colors">Features</a>
@@ -97,7 +97,7 @@ export default function LandingPage() {
         </div>
       ) : showGame ? (
         <div className="container mx-auto px-4 pt-24 relative z-10">
-          <GameSeries />
+      <GameSeries />
         </div>
       ) : (
         <div className="w-full">
@@ -107,10 +107,10 @@ export default function LandingPage() {
             <div className="container mx-auto px-8 py-4 z-10 relative">
               <div className="max-w-3xl mx-auto text-center">
                 <h1 className="text-4xl md:text-6xl font-extrabold text-white mb-3 leading-tight tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]">
-                  Cognitive Challenge Series
+                  IQ Level Challenge Series
                 </h1>
                 <p className="text-lg md:text-xl text-[#F3F4F6] mb-4 leading-relaxed drop-shadow-[0_1px_2px_rgba(0,0,0,0.3)]">
-                  Test and improve your cognitive abilities through engaging games that measure memory, attention, and problem-solving
+                  Test and enhance your IQ through engaging games that measure memory, attention, and problem-solving abilities
                 </p>
                 
                 {/* Start Game Button */}
@@ -225,7 +225,7 @@ export default function LandingPage() {
             {/* Below About Us Section */}
             <div className="bg-[#1E3A8A]/30 backdrop-blur-md rounded-lg p-6 border border-white/10 mb-12">
               <h2 className="text-2xl font-bold text-[#14B8A6] mb-4">
-                Why Choose CognitivePro?
+                Why Choose IQ Level?
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="bg-[#1E3A8A]/30 rounded-lg p-5 border border-white/10 hover:bg-[#1E3A8A]/40 transition-colors">
@@ -270,7 +270,7 @@ export default function LandingPage() {
                   <div className="space-y-4">
                     <div className="flex items-center space-x-2">
                       <Brain className="w-8 h-8 text-[#14B8A6]" />
-                      <span className="text-white font-bold text-xl">CognitivePro</span>
+                      <span className="text-white font-bold text-xl">IQ Level</span>
                     </div>
                     <p className="text-white/70">
                       Enhancing cognitive abilities through science-based games and exercises.
@@ -321,7 +321,7 @@ export default function LandingPage() {
                 <div className="pt-6 border-t border-white/10">
                   <div className="flex flex-col md:flex-row justify-between items-center">
                     <div className="text-white/50 text-sm mb-4 md:mb-0">
-                      © 2024 CognitivePro. All rights reserved.
+                      © 2024 IQ Level. All rights reserved.
                     </div>
                     <div className="flex space-x-6">
                       <a href="#" className="text-white/50 hover:text-white transition-colors text-sm">Privacy Policy</a>
