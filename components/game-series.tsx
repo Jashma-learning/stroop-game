@@ -13,7 +13,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RotateCcw } from "lucide-react";
 
-type GameType = "form" | "stroop" | "hanoi" | "pattern" | "maze" | "memory" | "word" | "complete";
+type GameType = "stroop" | "hanoi" | "pattern" | "maze" | "memory" | "word" | "complete";
 
 interface UserData {
   name: string;
@@ -41,7 +41,7 @@ const SESSION_KEYS = {
 }
 
 export default function GameSeries() {
-  const [currentGame, setCurrentGame] = useState<GameType>("form");
+  const [currentGame, setCurrentGame] = useState<GameType>("stroop");
   const [totalScore, setTotalScore] = useState(0);
   const [gameScores, setGameScores] = useState({
     stroop: 0,
@@ -112,7 +112,7 @@ export default function GameSeries() {
   };
 
   const restartSeries = () => {
-    setCurrentGame("form");
+    setCurrentGame("stroop");
     setTotalScore(0);
     setGameScores({
       stroop: 0,
@@ -135,8 +135,7 @@ export default function GameSeries() {
   };
 
   return (
-    <div className="w-full max-w-md">
-      {currentGame === "form" && <UserForm onSubmit={handleUserSubmit} />}
+    <div className="w-full max-w-md mx-auto">
       {currentGame === "stroop" && <StroopGame onComplete={(score, metrics) => handleGameComplete("stroop", score, metrics)} />}
       {currentGame === "hanoi" && <TowerOfHanoi onComplete={(score, metrics) => handleGameComplete("hanoi", score, metrics)} />}
       {currentGame === "pattern" && <PatternPuzzler onComplete={(score) => handleGameComplete("pattern", score)} />}
@@ -144,7 +143,7 @@ export default function GameSeries() {
       {currentGame === "memory" && <MemoryGame onComplete={(score, metrics) => handleGameComplete("memory", score, metrics)} />}
       {currentGame === "word" && <WordPuzzle onComplete={(score, metrics) => handleGameComplete("word", score, metrics)} />}
       {currentGame === "complete" && (
-        <Card className="w-full p-6 shadow-xl bg-white">
+        <Card className="w-full p-6 shadow-xl bg-white border-t-4 border-[#1E3A8A]">
           <div className="text-center mb-6">
             <h1 className="text-3xl font-bold text-[#1E3A8A] mb-2">Challenge Complete!</h1>
             <p className="text-gray-600">You've completed all cognitive games!</p>
@@ -152,33 +151,33 @@ export default function GameSeries() {
 
           <div className="bg-[#F3F4F6] p-6 rounded-lg mb-6">
             <div className="mb-4 text-center">
-              <p className="text-lg font-semibold">Total Score</p>
+              <p className="text-lg font-semibold text-[#1E3A8A]">Total Score</p>
               <p className="text-4xl font-bold text-[#6D28D9]">{totalScore}</p>
             </div>
 
             <div className="space-y-3">
               <div className="flex justify-between items-center">
-                <p className="font-medium">Stroop Challenge</p>
+                <p className="font-medium text-[#1E3A8A]">Stroop Challenge</p>
                 <p className="text-xl font-bold text-[#14B8A6]">{gameScores.stroop}</p>
               </div>
               <div className="flex justify-between items-center">
-                <p className="font-medium">Tower of Hanoi</p>
+                <p className="font-medium text-[#1E3A8A]">Tower of Hanoi</p>
                 <p className="text-xl font-bold text-[#14B8A6]">{gameScores.hanoi}</p>
               </div>
               <div className="flex justify-between items-center">
-                <p className="font-medium">Pattern Puzzler</p>
+                <p className="font-medium text-[#1E3A8A]">Pattern Puzzler</p>
                 <p className="text-xl font-bold text-[#14B8A6]">{gameScores.pattern}</p>
               </div>
               <div className="flex justify-between items-center">
-                <p className="font-medium">Maze Navigator</p>
+                <p className="font-medium text-[#1E3A8A]">Maze Navigator</p>
                 <p className="text-xl font-bold text-[#14B8A6]">{gameScores.maze}</p>
               </div>
               <div className="flex justify-between items-center">
-                <p className="font-medium">Memory Match</p>
+                <p className="font-medium text-[#1E3A8A]">Memory Match</p>
                 <p className="text-xl font-bold text-[#14B8A6]">{gameScores.memory}</p>
               </div>
               <div className="flex justify-between items-center">
-                <p className="font-medium">Word Puzzle</p>
+                <p className="font-medium text-[#1E3A8A]">Word Puzzle</p>
                 <p className="text-xl font-bold text-[#14B8A6]">{gameScores.word}</p>
               </div>
             </div>
@@ -188,7 +187,7 @@ export default function GameSeries() {
 
           <Button
             onClick={restartSeries}
-            className="w-full py-6 text-lg bg-[#6D28D9] hover:bg-[#5B21B6] flex items-center justify-center mt-6"
+            className="w-full py-6 text-lg bg-[#6D28D9] hover:bg-[#6D28D9]/90 flex items-center justify-center mt-6"
           >
             <RotateCcw className="w-5 h-5 mr-2" />
             Start New Session
